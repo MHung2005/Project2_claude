@@ -19,6 +19,9 @@ from .core.config import settings
 from .core.exception_handlers import register_exception_handlers
 from .core.response import success_response
 
+from .repositories.account_repository import AccountRepository
+from .core.security import hash_password
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.APP_TITLE, version=settings.APP_VERSION)
@@ -42,6 +45,11 @@ def create_app() -> FastAPI:
     app.include_router(employee_auth_router)  # /auth/employee/login
     app.include_router(manager_router)        # /manager/*
     app.include_router(employee_router)       # /employee/*
+
+    #── Khởi tạo tài khoản admin nếu chưa có ───────────────────────────────
+    account_repo = AccountRepository()
+    if not account_repo.get_manager("admin"):
+        account_repo.save_manager("admin", hash_password("admin123"))
 
     @app.get("/health", tags=["System"])
     def health():
