@@ -9,7 +9,8 @@ export default function ProtectedRoute({ children, role }) {
   }
 
   if (role && userRole !== role) {
-    return <Navigate to={userRole === 'manager' ? '/quan-ly' : '/trang-chu'} replace />;
+    // Redirect to the correct home for each role
+    return <Navigate to={userRole === 'manager' ? '/quan-ly' : '/doi-mat-khau'} replace />;
   }
 
   return children;

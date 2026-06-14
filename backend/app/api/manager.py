@@ -3,26 +3,27 @@ backend/app/api/manager.py
 
 Controller — chức năng của Quản lý (Manager):
   - Employee CRUD            : /manager/employees
-  - Bulk import               : /manager/employees/bulk-import
-  - Biometric approval        : /manager/employees/pending, /approve
-  - Attendance records         : /manager/attendance
-  - Analytics                 : /manager/analytics/daily, /stats, /stats/weekly, /stats/range
-  - Location config            : /manager/location
-  - Schedule config            : /manager/schedule
+  - Bulk import              : /manager/employees/bulk-import
+  - Attendance records       : /manager/attendance
+  - Analytics                : /manager/analytics/daily, /stats, /stats/weekly, /stats/range
+  - Location config          : /manager/location
+  - Schedule config          : /manager/schedule
+
+NOTE: Biometric approval đã bị bỏ — khuôn mặt tự động approved khi nhân viên đăng ký.
 """
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, Query
 
 from ..core.response import success_response
 from ..core.security import get_current_manager
-from ..schemas.employee_schema import UpdateEmployeeRequest, ApproveBiometricRequest
+from ..schemas.employee_schema import UpdateEmployeeRequest
 from ..schemas.config_schema import LocationConfigRequest, ScheduleConfigRequest
 from ..services.manager_service import ManagerService
 from ..services.config_service import ConfigService
 
 manager_router = APIRouter(prefix="/manager", tags=["Manager"])
 manager_service = ManagerService()
-config_service = ConfigService()
+config_service  = ConfigService()
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -76,30 +77,11 @@ async def bulk_import_employees(
     current_manager: dict = Depends(get_current_manager),
 ):
     filename = file.filename or ""
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    ext      = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     contents = await file.read()
 
     data = manager_service.bulk_import_employees(contents, ext)
     return success_response("Import hoàn tất", data)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# BIOMETRIC APPROVAL
-# ─────────────────────────────────────────────────────────────────────────
-@manager_router.get("/employees/pending")
-def get_pending(current_manager: dict = Depends(get_current_manager)):
-    data = manager_service.get_pending_employees()
-    return success_response("OK", data)
-
-
-@manager_router.put("/employees/{user_id}/approve")
-def approve_employee(
-    user_id: str,
-    body: ApproveBiometricRequest,
-    current_manager: dict = Depends(get_current_manager),
-):
-    manager_service.approve_biometric(user_id, body.status)
-    return success_response("Đã cập nhật trạng thái xác thực khuôn mặt")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -119,8 +101,8 @@ def get_attendance(
 # ─────────────────────────────────────────────────────────────────────────
 @manager_router.get("/analytics/daily")
 def get_daily_analytics(
-    date: str = Query(default=None, description="YYYY-MM-DD, mặc định hôm nay"),
-    search: str = Query(default="", description="Tìm kiếm tên / phòng ban"),
+    date:   str = Query(default=None, description="YYYY-MM-DD, mặc định hôm nay"),
+    search: str = Query(default="",   description="Tìm kiếm tên / phòng ban"),
     current_manager: dict = Depends(get_current_manager),
 ):
     data = manager_service.get_daily_analytics(date, search)
@@ -156,7 +138,10 @@ def get_checkins_range(
 # LOCATION CONFIG
 # ─────────────────────────────────────────────────────────────────────────
 @manager_router.put("/location")
-def set_location(body: LocationConfigRequest, current_manager: dict = Depends(get_current_manager)):
+def set_location(
+    body: LocationConfigRequest,
+    current_manager: dict = Depends(get_current_manager),
+):
     config_service.set_location(body.lat, body.lng, body.radius)
     return success_response("Đã cập nhật vị trí điểm danh")
 
@@ -177,6 +162,9 @@ def get_schedule(current_manager: dict = Depends(get_current_manager)):
 
 
 @manager_router.put("/schedule")
-def set_schedule(body: ScheduleConfigRequest, current_manager: dict = Depends(get_current_manager)):
+def set_schedule(
+    body: ScheduleConfigRequest,
+    current_manager: dict = Depends(get_current_manager),
+):
     config_service.set_schedule(body.start_time, body.end_time, body.grace_minutes)
     return success_response("Đã cập nhật lịch làm việc")

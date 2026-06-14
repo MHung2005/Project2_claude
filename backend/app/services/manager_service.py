@@ -1,15 +1,6 @@
-"""
-backend/app/services/manager_service.py
-
-Business logic cho các chức năng của Quản lý (Manager):
-  - CRUD nhân viên (đăng ký khuôn mặt, sửa, xóa, danh sách)
-  - Import nhân viên hàng loạt từ Excel/CSV
-  - Duyệt / từ chối biometric
-  - Xem báo cáo chấm công (theo ngày, theo tuần, theo khoảng ngày)
-  - Thống kê tổng quan (analytics)
-"""
-
 import io
+import secrets
+import string
 from datetime import datetime
 
 import numpy as np
@@ -30,11 +21,17 @@ COLUMN_MAP = {
     "name": "name", "họ tên": "name", "tên": "name", "full_name": "name",
     "department": "department", "phòng ban": "department", "phòng": "department",
     "position": "position", "chức vụ": "position", "vị trí": "position",
-    "email": "email", "e-mail": "email",
     "phone": "phone", "số điện thoại": "phone", "điện thoại": "phone", "sdt": "phone",
     "username": "username", "tên đăng nhập": "username",
     "password": "password", "mật khẩu": "password",
 }
+
+PASSWORD_LENGTH = 10
+PASSWORD_ALPHABET = string.ascii_letters + string.digits
+
+
+def _generate_password(length: int = PASSWORD_LENGTH) -> str:
+    return "".join(secrets.choice(PASSWORD_ALPHABET) for _ in range(length))
 
 
 class ManagerService:
@@ -85,7 +82,7 @@ class ManagerService:
         if not self.employee_repo.update_employee(user_id, name, department, position):
             raise NotFoundException("Không tìm thấy nhân viên")
 
-    # ── BULK IMPORT ──────────────────────────────────────────────────
+    # ── BULK IMPORT / CẤP TÀI KHOẢN ──────────────────────────────────
     def bulk_import_employees(self, contents: bytes, ext: str) -> dict:
         if ext not in ("xlsx", "xls", "csv"):
             raise ValidationException("Chỉ hỗ trợ file .xlsx, .xls hoặc .csv")
@@ -98,11 +95,19 @@ class ManagerService:
         if not rows:
             raise ValidationException("File không có dữ liệu hợp lệ")
 
-        # Hash mật khẩu nếu có
+        # Mỗi nhân viên luôn được cấp username + mật khẩu (tự sinh nếu thiếu)
         for row in rows:
-            plain_pw = row.pop("password", None)
-            if plain_pw:
-                row["hashed_password"] = hash_password(str(plain_pw))
+            username = row.get("username", "").strip()
+            if not username:
+                username = row.get("user_id", "").strip()
+                row["username"] = username
+
+            plain_pw = row.get("password", "").strip() if row.get("password") else ""
+            if not plain_pw:
+                plain_pw = _generate_password()
+
+            row["generated_password"] = plain_pw
+            row["hashed_password"] = hash_password(plain_pw)
 
         created, skipped, errors = [], [], []
         for emp in rows:
@@ -120,9 +125,20 @@ class ManagerService:
                 hashed_pw = emp.get("hashed_password", "")
                 if username and hashed_pw:
                     self.employee_repo.attach_login_account(user_id, username, hashed_pw)
-                created.append(user_id)
+                created.append({
+                    "user_id":  user_id,
+                    "name":     name,
+                    "username": username,
+                    "password": emp.get("generated_password", ""),
+                })
             except Exception as e:
                 errors.append({"row": emp, "reason": str(e)})
+
+        # Loại bỏ mật khẩu đã hash khỏi preview, chỉ giữ mật khẩu thô để hiển thị 1 lần
+        preview = []
+        for row in rows[:10]:
+            preview_row = {k: v for k, v in row.items() if k != "hashed_password"}
+            preview.append(preview_row)
 
         return {
             "total_rows":    len(rows),
@@ -132,7 +148,7 @@ class ManagerService:
             "created":       created,
             "skipped":       skipped,
             "errors":        errors,
-            "preview":       rows[:10],
+            "preview":       preview,
         }
 
     @staticmethod

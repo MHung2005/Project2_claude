@@ -1,29 +1,35 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutGrid,
+  Lock,
   ScanFace,
   Fingerprint,
   BarChart3,
+  BarChart2,
   UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
+// Employee: 4 chế độ
 const employeeLinks = [
-  { to: '/trang-chu', label: 'Trang chủ', icon: LayoutGrid },
-  { to: '/dang-ky-khuon-mat', label: 'Đăng ký khuôn mặt', icon: ScanFace },
-  { to: '/diem-danh', label: 'Điểm danh', icon: Fingerprint },
-  { to: '/thong-ke', label: 'Thống kê', icon: BarChart3 },
+  { to: '/doi-mat-khau',      label: 'Thay đổi mật khẩu',  icon: Lock        },
+  { to: '/dang-ky-khuon-mat', label: 'Đăng ký khuôn mặt',  icon: ScanFace    },
+  { to: '/diem-danh',         label: 'Điểm danh',           icon: Fingerprint },
+  { to: '/thong-ke',          label: 'Thống kê',            icon: BarChart3   },
 ];
 
-const managerExtra = { to: '/cap-tai-khoan', label: 'Cấp tài khoản', icon: UserPlus };
+// Manager: 2 chế độ
+const managerLinks = [
+  { to: '/cap-tai-khoan', label: 'Cấp tài khoản nhân viên', icon: UserPlus  },
+  { to: '/quan-ly',       label: 'Xem thống kê',            icon: BarChart2 },
+];
 
 export default function Sidebar({ statusLabel }) {
   const { user, isManager } = useAuth();
-  const links = isManager ? [...employeeLinks, managerExtra] : employeeLinks;
+  const links = isManager ? managerLinks : employeeLinks;
 
   const greetingName = isManager ? 'Quản lý' : (user?.name || 'User');
-  const initial = greetingName.trim().charAt(0).toUpperCase();
+  const initial      = greetingName.trim().charAt(0).toUpperCase();
 
   return (
     <aside className="sidebar">

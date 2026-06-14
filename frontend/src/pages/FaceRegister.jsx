@@ -11,17 +11,17 @@ import './FaceRegister.css';
 const STEPS = [
   'Nhìn thẳng vào camera',
   'Giữ nguyên vị trí',
-  'Xoay nhẹ đầu',
+  'Xoay nhẹ đầu sang phải',
   'Hoàn tất',
 ];
 
 export default function FaceRegister() {
   const { videoRef, ready, error: cameraError, captureFrame } = useCamera();
-  const [step, setStep] = useState(2); // matches mockup state "Xoay nhẹ đầu"
+  const [step, setStep]         = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const { showToast } = useToast();
-  const navigate = useNavigate();
+  const [done, setDone]         = useState(false);
+  const { showToast }           = useToast();
+  const navigate                = useNavigate();
 
   const handleConfirm = async () => {
     if (!ready) {
@@ -29,21 +29,27 @@ export default function FaceRegister() {
       return;
     }
     setSubmitting(true);
+    // Animate through steps
+    setStep(1);
+    await new Promise((r) => setTimeout(r, 500));
+    setStep(2);
+    await new Promise((r) => setTimeout(r, 500));
+    setStep(3);
     try {
       const blob = await captureFrame();
       if (!blob) throw new Error('no-frame');
       const file = new File([blob], 'face-register.jpg', { type: 'image/jpeg' });
       await registerFace(file);
       setDone(true);
-      setStep(3);
-      showToast('Đăng ký khuôn mặt thành công', 'success');
-      setTimeout(() => navigate('/trang-chu'), 1400);
+      showToast('Đăng ký khuôn mặt thành công! Bạn có thể điểm danh ngay.', 'success');
+      setTimeout(() => navigate('/diem-danh'), 1600);
     } catch (err) {
       const detail = err?.response?.data?.detail;
       const message = Array.isArray(detail)
         ? detail.map((d) => d.msg).join(', ')
         : detail || 'Đăng ký khuôn mặt thất bại. Vui lòng thử lại.';
       showToast(message, 'error');
+      setStep(0);
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +64,8 @@ export default function FaceRegister() {
           <div className="fr__center">
             <h1 className="fr__title">Đăng ký khuôn mặt</h1>
             <p className="fr__subtitle">
-              Vui lòng làm theo hướng dẫn để thiết lập bảo mật sinh trắc học của bạn.
+              Nhìn thẳng vào camera và giữ khuôn mặt trong khung hình.
+              Khuôn mặt sẽ được kích hoạt ngay sau khi đăng ký.
             </p>
 
             <div className="fr__frame-wrap">
@@ -79,24 +86,25 @@ export default function FaceRegister() {
             <div className="fr__status">
               <div className="fr__status-icon">{done ? <CheckCircle2 size={18} /> : '🙂'}</div>
               <div>
-                <div className="fr__status-label">TRẠNG THÁI HIỆN TẠI</div>
-                <div className="fr__status-value">{done ? 'Hoàn tất' : STEPS[step]}</div>
+                <div className="fr__status-label">TRẠNG THÁI</div>
+                <div className="fr__status-value">{done ? 'Đã đăng ký thành công' : STEPS[step]}</div>
               </div>
             </div>
 
+            {done && (
+              <div className="fr__success-note">
+                <CheckCircle2 size={16} strokeWidth={2.2} />
+                Khuôn mặt đã được kích hoạt. Bạn có thể sử dụng điểm danh ngay!
+              </div>
+            )}
+
             <button className="fr__confirm" onClick={handleConfirm} disabled={submitting || done}>
               {submitting ? (
-                <>
-                  <Loader2 size={18} className="fr__spin" /> Đang xử lý...
-                </>
+                <><Loader2 size={18} className="fr__spin" /> Đang xử lý...</>
               ) : done ? (
-                <>
-                  <CheckCircle2 size={18} /> Đã đăng ký
-                </>
+                <><CheckCircle2 size={18} /> Đã đăng ký</>
               ) : (
-                <>
-                  <CheckCircle2 size={18} /> Xác nhận mẫu khuôn mặt
-                </>
+                <><CheckCircle2 size={18} /> Xác nhận đăng ký khuôn mặt</>
               )}
             </button>
           </div>

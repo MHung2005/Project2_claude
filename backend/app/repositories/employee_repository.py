@@ -29,7 +29,7 @@ class EmployeeRepository:
             "name":             name.encode(),
             "department":       department.encode(),
             "position":         position.encode(),
-            "biometric_status": b"pending",
+            "biometric_status": b"approved",   # auto-approved, no manager review
             "vector_embedding": vector_bytes,
         })
 
@@ -37,7 +37,7 @@ class EmployeeRepository:
         vector_bytes = np.array(vector, dtype=np.float32).tobytes()
         self.redis.hset(f"employee:{user_id}", mapping={
             "vector_embedding": vector_bytes,
-            "biometric_status": b"pending",
+            "biometric_status": b"approved",   # auto-approved
         })
 
     def update_employee(self, user_id: str, name: str, department: str, position: str) -> bool:
@@ -69,7 +69,7 @@ class EmployeeRepository:
             "position":         fields.get("position", "").encode(),
             "email":            fields.get("email", "").encode(),
             "phone":            fields.get("phone", "").encode(),
-            "biometric_status": b"pending",
+            "biometric_status": b"approved",   # auto-approved
         }
         self.redis.hset(f"employee:{user_id}", mapping=mapping)
 
@@ -81,6 +81,13 @@ class EmployeeRepository:
         })
         self.redis.set(f"emp_login:{username}", user_id.encode())
 
+    def update_password(self, user_id: str, hashed_password: str) -> bool:
+        key = f"employee:{user_id}"
+        if not self.redis.exists(key):
+            return False
+        self.redis.hset(key, "password", hashed_password.encode())
+        return True
+
     # ── DELETE ───────────────────────────────────────────────────────
     def delete(self, user_id: str) -> bool:
         return self.redis.delete(f"employee:{user_id}") > 0
@@ -91,6 +98,16 @@ class EmployeeRepository:
 
     def get_raw(self, user_id: str) -> dict:
         return self.redis.hgetall(f"employee:{user_id}")
+
+    def get_face_vector(self, user_id: str):
+        """Lấy vector embedding của đúng user_id, trả về numpy array hoặc None."""
+        data = self.redis.hgetall(f"employee:{user_id}")
+        if not data:
+            return None
+        raw = data.get(b"vector_embedding")
+        if raw is None:
+            return None
+        return np.frombuffer(raw, dtype=np.float32)
 
     def get_all(self) -> list[dict]:
         employees = []
@@ -115,7 +132,7 @@ class EmployeeRepository:
                     "position":         decoded.get("position", ""),
                     "email":            decoded.get("email", ""),
                     "phone":            decoded.get("phone", ""),
-                    "biometric_status": decoded.get("biometric_status", "pending"),
+                    "biometric_status": decoded.get("biometric_status", "approved"),
                     "last_attendance":  decoded.get("last_attendance", ""),
                 })
             except Exception as e:
@@ -129,7 +146,7 @@ class EmployeeRepository:
         data = self.redis.hgetall(f"employee:{user_id.decode()}")
         return {k.decode(): v.decode() for k, v in data.items()}
 
-    # ── VECTOR SEARCH ────────────────────────────────────────────────
+    # ── VECTOR SEARCH (kept for manager use, not for checkin) ────────
     def search_by_vector(self, query_vector, top_k: int = 1) -> dict | None:
         vector_bytes = np.array(query_vector, dtype=np.float32).tobytes()
         q = (
@@ -149,3 +166,11 @@ class EmployeeRepository:
             "position":   doc.position.decode() if isinstance(doc.position, bytes) else doc.position,
             "score":      1 - float(doc.score),
         }
+
+    def cosine_similarity(self, vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+        """Tính cosine similarity giữa 2 vector."""
+        norm_a = np.linalg.norm(vec_a)
+        norm_b = np.linalg.norm(vec_b)
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return float(np.dot(vec_a, vec_b) / (norm_a * norm_b))

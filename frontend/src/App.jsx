@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
-import EmployeeDashboard from './pages/EmployeeDashboard';
+import ChangePassword from './pages/ChangePassword';
 import FaceRegister from './pages/FaceRegister';
 import CheckIn from './pages/CheckIn';
 import StatsPage from './pages/StatsPage';
@@ -14,7 +14,7 @@ import './styles/global.css';
 function RootRedirect() {
   const { isAuthenticated, isManager } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <Navigate to={isManager ? '/quan-ly' : '/trang-chu'} replace />;
+  return <Navigate to={isManager ? '/quan-ly' : '/doi-mat-khau'} replace />;
 }
 
 export default function App() {
@@ -26,18 +26,19 @@ export default function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/login" element={<Login />} />
 
+            {/* ── EMPLOYEE routes ── */}
             <Route
-              path="/trang-chu"
+              path="/doi-mat-khau"
               element={
-                <ProtectedRoute>
-                  <EmployeeDashboard />
+                <ProtectedRoute role="employee">
+                  <ChangePassword />
                 </ProtectedRoute>
               }
             />
             <Route
               path="/dang-ky-khuon-mat"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="employee">
                   <FaceRegister />
                 </ProtectedRoute>
               }
@@ -45,7 +46,7 @@ export default function App() {
             <Route
               path="/diem-danh"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="employee">
                   <CheckIn />
                 </ProtectedRoute>
               }
@@ -53,12 +54,13 @@ export default function App() {
             <Route
               path="/thong-ke"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="employee">
                   <StatsPage />
                 </ProtectedRoute>
               }
             />
 
+            {/* ── MANAGER routes ── */}
             <Route
               path="/quan-ly"
               element={

@@ -2,8 +2,9 @@
 backend/app/services/employee_service.py
 
 Business logic cho các chức năng của Nhân viên (Employee):
-  - Chấm công vào / ra (Face Recognition + GPS)
-  - Đăng ký / cập nhật khuôn mặt
+  - Chấm công vào / ra (Face Recognition + GPS) — chỉ so khớp vector của chính user
+  - Đăng ký / cập nhật khuôn mặt (tự động approved, không cần duyệt)
+  - Đổi mật khẩu
   - Xem hồ sơ cá nhân
   - Xem thống kê chấm công cá nhân (theo ngày/tháng)
 """
@@ -19,6 +20,7 @@ from ..core.response import (
     NotFoundException, ValidationException, UnauthorizedException,
     ForbiddenException, ConflictException,
 )
+from ..core.security import verify_password, hash_password
 from ..repositories.employee_repository import EmployeeRepository
 from ..repositories.attendance_repository import AttendanceRepository
 from .ai.embeddings import FaceEmbeddingService
@@ -53,66 +55,98 @@ class EmployeeService:
         return vector
 
     def _check_gps(self, lat: float | None, lng: float | None, required: bool = False) -> bool:
-        """Trả về gps_ok (bool). Raise nếu vị trí ngoài bán kính cho phép."""
         if lat is None or lng is None:
             if required:
                 raise ForbiddenException("Cần cung cấp vị trí GPS để chấm công")
             return False
-
         loc = self.config_service.config_repo.get_location()
         if loc and not is_within_radius(lat, lng, loc["lat"], loc["lng"], loc["radius"]):
             raise ForbiddenException("Bạn không trong phạm vi cho phép điểm danh")
         return True
 
+    def _verify_face_against_user(self, query_vector: np.ndarray, user_id: str) -> None:
+        """
+        So khớp vector khuôn mặt CHỈ với vector đã đăng ký của chính user_id đó.
+        Raise UnauthorizedException nếu không khớp hoặc chưa đăng ký.
+        """
+        stored_vector = self.employee_repo.get_face_vector(user_id)
+        if stored_vector is None:
+            raise ForbiddenException(
+                "Bạn chưa đăng ký khuôn mặt. Vui lòng đăng ký trước khi điểm danh."
+            )
+        similarity = self.employee_repo.cosine_similarity(query_vector, stored_vector)
+        if similarity < settings.FACE_MATCH_THRESHOLD:
+            raise UnauthorizedException(
+                f"Khuôn mặt không khớp (độ tương đồng: {similarity:.2f}). "
+                "Vui lòng thử lại với điều kiện ánh sáng tốt hơn."
+            )
+
+    # ── CHANGE PASSWORD ──────────────────────────────────────────────
+    def change_password(self, user_id: str, old_password: str, new_password: str) -> None:
+        data = self.employee_repo.get_raw(user_id)
+        if not data:
+            raise NotFoundException("Không tìm thấy hồ sơ nhân viên")
+
+        stored_hash = data.get(b"password", b"").decode()
+        if not stored_hash or not verify_password(old_password, stored_hash):
+            raise UnauthorizedException("Mật khẩu hiện tại không đúng")
+
+        if len(new_password) < 6:
+            raise ValidationException("Mật khẩu mới phải có ít nhất 6 ký tự")
+
+        self.employee_repo.update_password(user_id, hash_password(new_password))
+
     # ── CHECK-IN ─────────────────────────────────────────────────────
     def checkin(self, user_id: str, file_contents: bytes,
-                 lat: float | None, lng: float | None) -> dict:
-        vector = self._extract_face_vector(
+                lat: float | None, lng: float | None) -> dict:
+        # 1. Trích xuất vector từ ảnh chụp
+        query_vector = self._extract_face_vector(
             file_contents,
             "Không nhận diện được khuôn mặt. Vui lòng đảm bảo khuôn mặt rõ ràng, đủ ánh sáng."
         )
 
-        match = self.employee_repo.search_by_vector(vector)
-        if match is None or match["score"] < settings.FACE_MATCH_THRESHOLD:
-            raise UnauthorizedException("Khuôn mặt không khớp với hồ sơ đã đăng ký")
-        if match["user_id"] != user_id:
-            raise ForbiddenException("Khuôn mặt không khớp tài khoản đang đăng nhập")
+        # 2. Chỉ so khớp với vector của chính user này (không tìm kiếm toàn bộ DB)
+        self._verify_face_against_user(query_vector, user_id)
 
-        emp_data = self.employee_repo.get_raw(user_id)
-        bio_status = emp_data.get(b"biometric_status", b"approved").decode()
-        if bio_status == "pending":
-            raise ForbiddenException("Khuôn mặt chưa được duyệt bởi quản lý")
-        if bio_status == "rejected":
-            raise ForbiddenException("Khuôn mặt bị từ chối, vui lòng đăng ký lại")
-
+        # 3. Kiểm tra GPS
         gps_ok = self._check_gps(lat, lng, required=False)
 
+        # 4. Kiểm tra đã điểm danh chưa
         today = datetime.now().strftime("%Y-%m-%d")
         if self.attendance_repo.exists_for_date(user_id, today):
             raise ConflictException("Bạn đã điểm danh hôm nay rồi")
 
+        # 5. Lấy thông tin nhân viên để lưu bản ghi
+        raw = self.employee_repo.get_raw(user_id)
+        if not raw:
+            raise NotFoundException("Không tìm thấy hồ sơ nhân viên")
+        name       = raw.get(b"name", b"").decode()
+        department = raw.get(b"department", b"").decode()
+        position   = raw.get(b"position", b"").decode()
+
+        # 6. Tính trạng thái & lưu
         now = datetime.now()
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         status = self.config_service.compute_checkin_status(now)
 
         self.attendance_repo.save_checkin(
-            user_id=user_id, name=match["name"], department=match["department"],
-            position=match["position"], timestamp=timestamp, status=status,
+            user_id=user_id, name=name, department=department,
+            position=position, timestamp=timestamp, status=status,
             lat=lat, lng=lng, gps_ok=gps_ok,
         )
         self.employee_repo.set_last_attendance(user_id, today)
 
         return {
-            "name":           match["name"],
-            "department":     match["department"],
-            "position":       match["position"],
+            "name":           name,
+            "department":     department,
+            "position":       position,
             "timestamp":      timestamp,
             "checkin_status": status,
         }
 
     # ── CHECK-OUT ────────────────────────────────────────────────────
     def checkout(self, user_id: str, file_contents: bytes,
-                  lat: float | None, lng: float | None) -> dict:
+                 lat: float | None, lng: float | None) -> dict:
         today = datetime.now().strftime("%Y-%m-%d")
 
         if not self.attendance_repo.exists_for_date(user_id, today):
@@ -120,12 +154,9 @@ class EmployeeService:
         if self.attendance_repo.has_checked_out(user_id, today):
             raise ConflictException("Bạn đã check-out hôm nay rồi")
 
-        vector = self._extract_face_vector(file_contents, "Không nhận diện được khuôn mặt")
-
-        match = self.employee_repo.search_by_vector(vector)
-        if (match is None or match["score"] < settings.FACE_MATCH_THRESHOLD
-                or match["user_id"] != user_id):
-            raise UnauthorizedException("Xác thực khuôn mặt thất bại")
+        # So khớp chỉ với vector của chính user
+        query_vector = self._extract_face_vector(file_contents, "Không nhận diện được khuôn mặt")
+        self._verify_face_against_user(query_vector, user_id)
 
         self._check_gps(lat, lng, required=False)
 
@@ -143,6 +174,7 @@ class EmployeeService:
             file_contents,
             "Không nhận diện được khuôn mặt. Đảm bảo khuôn mặt rõ ràng, đủ ánh sáng, nhìn thẳng."
         )
+        # update_face_vector tự set biometric_status = "approved"
         self.employee_repo.update_face_vector(user_id, vector)
 
     # ── PROFILE ──────────────────────────────────────────────────────
@@ -150,7 +182,6 @@ class EmployeeService:
         data = self.employee_repo.get_raw(user_id)
         if not data:
             raise NotFoundException("Không tìm thấy hồ sơ")
-
         decoded = {}
         for k, v in data.items():
             key = k.decode() if isinstance(k, bytes) else k
@@ -174,7 +205,6 @@ class EmployeeService:
             day_date = datetime(year, month, d).date()
             if day_date > today:
                 break
-
             date_str = day_date.strftime("%Y-%m-%d")
             record = self.attendance_repo.get_record(user_id, date_str)
             if record:
@@ -212,14 +242,14 @@ class EmployeeService:
     def get_attendance_log(self, user_id: str, start_date: str, end_date: str) -> dict:
         try:
             start = datetime.strptime(start_date, "%Y-%m-%d")
-            end = datetime.strptime(end_date, "%Y-%m-%d")
+            end   = datetime.strptime(end_date,   "%Y-%m-%d")
         except ValueError:
             raise ValidationException("Định dạng ngày không hợp lệ (cần YYYY-MM-DD)")
         if start > end:
             raise ValidationException("start_date phải <= end_date")
 
-        records = []
         from datetime import timedelta
+        records = []
         day = start
         while day <= end:
             date_str = day.strftime("%Y-%m-%d")

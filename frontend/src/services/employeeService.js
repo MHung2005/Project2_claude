@@ -8,6 +8,9 @@ export const getMonthlyStats = (year, month) =>
 export const getAttendance = (start_date, end_date) =>
   api.get('/employee/attendance', { params: { start_date, end_date } });
 
+export const changePassword = (old_password, new_password) =>
+  api.post('/employee/change-password', { old_password, new_password });
+
 export const registerFace = (file) => {
   const formData = new FormData();
   formData.append('file', file);
