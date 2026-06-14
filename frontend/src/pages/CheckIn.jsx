@@ -18,13 +18,13 @@ function formatDate(date) {
 }
 
 export default function CheckIn() {
-  const [now, setNow] = useState(new Date());
-  const [mode, setMode] = useState('checkin'); // 'checkin' | 'checkout'
+  const [now, setNow]           = useState(new Date());
+  const [mode, setMode]         = useState('checkin'); // 'checkin' | 'checkout'
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null); // { type: 'success' | 'error', message }
+  const [result, setResult]     = useState(null); // { type: 'success' | 'error', message }
 
   const { videoRef, ready, error: cameraError, captureFrame } = useCamera();
-  const { position, error: gpsError, status: gpsStatus } = useGeolocation();
+  const { position, error: gpsError, status: gpsStatus }      = useGeolocation();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -41,17 +41,21 @@ export default function CheckIn() {
     try {
       const blob = await captureFrame();
       if (!blob) throw new Error('no-frame');
-      const file = new File([blob], `${mode}.jpg`, { type: 'image/jpeg' });
-      const lat = position?.lat ?? null;
-      const lng = position?.lng ?? null;
+      const file   = new File([blob], `${mode}.jpg`, { type: 'image/jpeg' });
+      const lat    = position?.lat ?? null;
+      const lng    = position?.lng ?? null;
       const apiCall = mode === 'checkin' ? checkin : checkout;
-      const { data } = await apiCall(file, lat, lng);
-      const message =
-        data?.message ||
+
+      const { data: payload } = await apiCall(file, lat, lng);
+      // Backend: { success, message, data: { name, department, position, timestamp, checkin_status } }
+      // or checkout: { success, message, data: { checkout_time } }
+      const message = payload?.message ||
         (mode === 'checkin' ? 'Chấm công vào ca thành công!' : 'Chấm công ra ca thành công!');
       setResult({ type: 'success', message });
     } catch (err) {
-      const detail = err?.response?.data?.detail;
+      // Backend error: { success: false, message: "...", data: null }
+      const payload = err?.response?.data;
+      const detail  = payload?.message || payload?.detail;
       let message;
       if (Array.isArray(detail)) {
         message = detail.map((d) => d.msg).join(', ');
@@ -67,11 +71,12 @@ export default function CheckIn() {
   };
 
   const gpsLabel =
-    gpsStatus === 'matched' ? 'Đã khớp GPS' : gpsStatus === 'error' ? 'Lỗi GPS' : 'Đang định vị...';
+    gpsStatus === 'matched' ? 'Đã khớp GPS' :
+    gpsStatus === 'error'   ? 'Lỗi GPS'     : 'Đang định vị...';
 
   const locationName = position
     ? `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`
-    : '123 Công Viên Phần Mề...';
+    : 'Chưa xác định vị trí';
 
   return (
     <div className="page">
@@ -116,13 +121,13 @@ export default function CheckIn() {
             <div className="ci__mode-switch">
               <button
                 className={`ci__mode-btn ${mode === 'checkin' ? 'ci__mode-btn--active' : ''}`}
-                onClick={() => setMode('checkin')}
+                onClick={() => { setMode('checkin'); setResult(null); }}
               >
                 Vào ca
               </button>
               <button
                 className={`ci__mode-btn ${mode === 'checkout' ? 'ci__mode-btn--active' : ''}`}
-                onClick={() => setMode('checkout')}
+                onClick={() => { setMode('checkout'); setResult(null); }}
               >
                 Ra ca
               </button>
@@ -130,11 +135,9 @@ export default function CheckIn() {
 
             {result && (
               <div className={`ci__result ci__result--${result.type}`}>
-                {result.type === 'success' ? (
-                  <CheckCircle2 size={18} strokeWidth={2.2} />
-                ) : (
-                  <XCircle size={18} strokeWidth={2.2} />
-                )}
+                {result.type === 'success'
+                  ? <CheckCircle2 size={18} strokeWidth={2.2} />
+                  : <XCircle     size={18} strokeWidth={2.2} />}
                 <span>{result.message}</span>
               </div>
             )}
@@ -148,14 +151,9 @@ export default function CheckIn() {
 
             <button className="ci__submit" onClick={handleSubmit} disabled={submitting}>
               {submitting ? (
-                <>
-                  <Loader2 size={20} className="ci__spin" /> Đang xử lý...
-                </>
+                <><Loader2 size={20} className="ci__spin" /> Đang xử lý...</>
               ) : (
-                <>
-                  <ScanFace size={20} strokeWidth={2} />
-                  Chấm công bằng nhận diện khuôn mặt
-                </>
+                <><ScanFace size={20} strokeWidth={2} /> Chấm công bằng nhận diện khuôn mặt</>
               )}
             </button>
           </div>

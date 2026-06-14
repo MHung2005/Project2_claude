@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  Home,
   Lock,
   ScanFace,
   Fingerprint,
@@ -10,15 +11,16 @@ import {
 import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
-// Employee: 4 chế độ
+// Employee: 5 chức năng
 const employeeLinks = [
-  { to: '/doi-mat-khau',      label: 'Thay đổi mật khẩu',  icon: Lock        },
-  { to: '/dang-ky-khuon-mat', label: 'Đăng ký khuôn mặt',  icon: ScanFace    },
-  { to: '/diem-danh',         label: 'Điểm danh',           icon: Fingerprint },
-  { to: '/thong-ke',          label: 'Thống kê',            icon: BarChart3   },
+  { to: '/trang-chu',          label: 'Trang chủ',           icon: Home        },
+  { to: '/doi-mat-khau',       label: 'Thay đổi mật khẩu',  icon: Lock        },
+  { to: '/dang-ky-khuon-mat',  label: 'Đăng ký khuôn mặt',  icon: ScanFace    },
+  { to: '/diem-danh',          label: 'Điểm danh',           icon: Fingerprint },
+  { to: '/thong-ke',           label: 'Thống kê',            icon: BarChart3   },
 ];
 
-// Manager: 2 chế độ
+// Manager: 2 chức năng
 const managerLinks = [
   { to: '/cap-tai-khoan', label: 'Cấp tài khoản nhân viên', icon: UserPlus  },
   { to: '/quan-ly',       label: 'Xem thống kê',            icon: BarChart2 },
@@ -57,16 +59,6 @@ export default function Sidebar({ statusLabel }) {
           </NavLink>
         ))}
       </nav>
-
-      {statusLabel && (
-        <div className="sidebar__status">
-          <div className="sidebar__status-label">TRẠNG THÁI HỆ THỐNG</div>
-          <div className="sidebar__status-value">
-            <span className="sidebar__status-dot" />
-            {statusLabel}
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

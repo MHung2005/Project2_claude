@@ -7,10 +7,10 @@ import { getDailyAnalytics, getStats } from '../services/managerService';
 import './ManagerDashboard.css';
 
 const DEPT_COLORS = {
-  'Kỹ thuật':  '#1f6f3f',
+  'Kỹ thuật':   '#1f6f3f',
   'Kinh doanh': '#3b82f6',
-  'Vận hành':  '#dc2626',
-  default:      '#94a3b8',
+  'Vận hành':   '#dc2626',
+  default:       '#94a3b8',
 };
 
 const PAGE_SIZE = 8;
@@ -20,13 +20,13 @@ function pad(n) {
 }
 
 export default function ManagerDashboard() {
-  const [analytics, setAnalytics]     = useState(null);
-  const [stats, setStats]             = useState(null);
-  const [search, setSearch]           = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [page, setPage]               = useState(0);
-  const [loading, setLoading]         = useState(true);
-  const [errorMsg, setErrorMsg]       = useState('');
+  const [analytics, setAnalytics]       = useState(null);
+  const [stats, setStats]               = useState(null);
+  const [search, setSearch]             = useState('');
+  const [searchInput, setSearchInput]   = useState('');
+  const [page, setPage]                 = useState(0);
+  const [loading, setLoading]           = useState(true);
+  const [errorMsg, setErrorMsg]         = useState('');
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -46,7 +46,9 @@ export default function ManagerDashboard() {
     Promise.allSettled([getDailyAnalytics(selectedDate, search), getStats()])
       .then(([analyticsRes, statsRes]) => {
         if (!isMounted) return;
+        // Backend: { success, message, data: { date, total_employees, present, on_time, late, absent, records } }
         if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data?.data);
+        // Backend: { success, message, data: { today, total, absent, late, on_time, rate } }
         if (statsRes.status      === 'fulfilled') setStats(statsRes.value.data?.data);
         if (analyticsRes.status === 'rejected' && statsRes.status === 'rejected') {
           setErrorMsg('Không thể tải dữ liệu. Vui lòng thử lại sau.');
@@ -60,7 +62,7 @@ export default function ManagerDashboard() {
   useEffect(() => { setPage(0); }, [search, selectedDate]);
 
   const records = useMemo(() => {
-    const raw = analytics?.records || [];
+    const raw = analytics?.records;
     return Array.isArray(raw) ? raw : [];
   }, [analytics]);
 
@@ -84,11 +86,12 @@ export default function ManagerDashboard() {
     [deptBreakdown]
   );
 
-  const onTimeRate    = stats?.rate;
-  const checkedIn     = analytics?.present  ?? stats?.today;
-  const lateCount     = analytics?.late     ?? stats?.late;
-  const notCheckedIn  = analytics?.absent   ?? stats?.absent;
-  const totalStaff    = analytics?.total_employees ?? stats?.total;
+  // Prefer analytics (per-date) over stats (today summary)
+  const onTimeRate   = analytics ? (analytics.total_employees > 0 ? Math.round(analytics.present / analytics.total_employees * 100) : 0) : stats?.rate;
+  const checkedIn    = analytics?.present    ?? stats?.today;
+  const lateCount    = analytics?.late       ?? stats?.late;
+  const notCheckedIn = analytics?.absent     ?? stats?.absent;
+  const totalStaff   = analytics?.total_employees ?? stats?.total;
 
   return (
     <div className="page">
@@ -114,10 +117,10 @@ export default function ManagerDashboard() {
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
               </div>
-              <button className="md__export" onClick={() => window.print()}>
+              {/* <button className="md__export" onClick={() => window.print()}>
                 <Download size={16} strokeWidth={2.2} />
                 Xuất báo cáo
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -126,9 +129,9 @@ export default function ManagerDashboard() {
           {/* Metric cards */}
           <div className="md__metric-grid">
             <div className="md__metric-card">
-              <div className="md__metric-label">TỶ LỆ ĐÚNG GIỜ</div>
+              <div className="md__metric-label">TỶ LỆ ĐIỂM DANH</div>
               <div className="md__metric-value md__metric-value--accent">
-                {typeof onTimeRate === 'number' ? `${Math.round(onTimeRate)}%` : '--'}
+                {typeof onTimeRate === 'number' ? `${onTimeRate}%` : '--'}
               </div>
               <div className="md__progress-track">
                 <div
@@ -268,8 +271,8 @@ export default function ManagerDashboard() {
                         const statusRaw = (rec.status || '').toLowerCase();
                         let statusLabel = rec.status || 'Vắng mặt';
                         let statusClass = 'md__badge--muted';
-                        if (statusRaw.includes('muộn'))  { statusLabel = 'Đi muộn';  statusClass = 'md__badge--danger';  }
-                        else if (statusRaw.includes('đúng')) { statusLabel = 'Đúng giờ'; statusClass = 'md__badge--success'; }
+                        if (statusRaw.includes('muộn'))       { statusLabel = 'Đi muộn';  statusClass = 'md__badge--danger';  }
+                        else if (statusRaw.includes('đúng'))  { statusLabel = 'Đúng giờ'; statusClass = 'md__badge--success'; }
                         else if (statusRaw.includes('vắng') || !rec.status) { statusLabel = 'Vắng mặt'; statusClass = 'md__badge--muted'; }
 
                         return (

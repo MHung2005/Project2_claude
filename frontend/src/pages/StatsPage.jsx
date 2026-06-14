@@ -26,11 +26,11 @@ export default function StatsPage() {
     setLoading(true);
     setErrorMsg('');
     getAttendance(range.start, range.end)
-      .then(({ data }) => {
+      .then(({ data: payload }) => {
         if (!isMounted) return;
-        const payload = data?.data;
-        const list = Array.isArray(payload) ? payload : payload?.records || [];
-        setRecords(list);
+        // Backend: { success, message, data: { user_id, start_date, end_date, total, records } }
+        const list = payload?.data?.records ?? [];
+        setRecords(Array.isArray(list) ? list : []);
       })
       .catch(() => {
         if (isMounted) setErrorMsg('Không thể tải lịch sử chấm công.');
@@ -38,9 +38,7 @@ export default function StatsPage() {
       .finally(() => {
         if (isMounted) setLoading(false);
       });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [range]);
 
   return (
@@ -106,13 +104,19 @@ export default function StatsPage() {
                           minute: '2-digit',
                         })
                       : '--:--';
+
+                    const statusRaw = (rec.status || '').toLowerCase();
+                    let badgeClass = 'sp__badge--muted';
+                    if (statusRaw.includes('đúng')) badgeClass = 'sp__badge--success';
+                    else if (statusRaw.includes('muộn')) badgeClass = 'sp__badge--danger';
+
                     return (
                       <tr key={idx}>
                         <td>{rec.date || '—'}</td>
                         <td className="sp__muted">{rec.timestamp ? checkinTime : '--:--'}</td>
                         <td className="sp__muted">{rec.checkout_time ? checkoutTime : '--:--'}</td>
                         <td>
-                          <span className="sp__badge">{rec.status || 'Vắng mặt'}</span>
+                          <span className={`sp__badge ${badgeClass}`}>{rec.status || 'Vắng mặt'}</span>
                         </td>
                       </tr>
                     );

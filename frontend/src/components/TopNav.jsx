@@ -22,7 +22,7 @@ export default function TopNav({ showRoleSwitch = false, showSettings = false })
 
   return (
     <header className="topnav">
-      <div className="topnav__brand">FaceTime &amp; GPS</div>
+      <div className="topnav__brand">FaceTime</div>
 
       {showRoleSwitch && (
         <nav className="topnav__tabs">

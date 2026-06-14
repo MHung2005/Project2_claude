@@ -157,7 +157,7 @@ export default function BulkImport() {
             <div className="bi__right">
               <div className="bi__card bi__preview">
                 <div className="bi__card-header">
-                  <h2>Xem trước dữ liệu</h2>
+                  <h2>Dữ liệu đã ghi vào hệ thống</h2>
                   {result && !result.error && (
                     <span className="bi__found-badge">{foundCount} nhân viên</span>
                   )}
@@ -195,11 +195,7 @@ export default function BulkImport() {
                             <td className="bi__name-cell">{row.name || row.full_name || '—'}</td>
                             <td className="bi__muted-text">{row.username || '—'}</td>
                             <td className="bi__muted-text">{row.department || '—'}</td>
-                            <td>
-                              {row.hashed_password
-                                ? <span className="bi__pw-ok">✓ Đã mã hóa</span>
-                                : <span className="bi__pw-missing">Thiếu</span>}
-                            </td>
+                            <td className="bi__muted-text">{row.password || '—'}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -9,12 +9,13 @@ import CheckIn from './pages/CheckIn';
 import StatsPage from './pages/StatsPage';
 import ManagerDashboard from './pages/ManagerDashboard';
 import BulkImport from './pages/BulkImport';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import './styles/global.css';
 
 function RootRedirect() {
   const { isAuthenticated, isManager } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <Navigate to={isManager ? '/quan-ly' : '/doi-mat-khau'} replace />;
+  return <Navigate to={isManager ? '/quan-ly' : '/trang-chu'} replace />;
 }
 
 export default function App() {
@@ -27,6 +28,14 @@ export default function App() {
             <Route path="/login" element={<Login />} />
 
             {/* ── EMPLOYEE routes ── */}
+            <Route
+              path="/trang-chu"
+              element={
+                <ProtectedRoute role="employee">
+                  <EmployeeDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/doi-mat-khau"
               element={

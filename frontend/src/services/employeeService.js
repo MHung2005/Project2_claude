@@ -1,5 +1,9 @@
 import api from './api';
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+// Backend luôn trả về: { success, message, data }
+// Các hàm dưới đây trả về axios response thô; component tự đọc res.data.data
+
 export const getProfile = () => api.get('/employee/profile');
 
 export const getMonthlyStats = (year, month) =>

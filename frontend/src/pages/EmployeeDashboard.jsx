@@ -49,7 +49,7 @@ export default function EmployeeDashboard() {
         const start = new Date(year, month - 1, 1);
         const end = now;
         const start_date = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
-        const end_date = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+        const end_date   = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
 
         const [profileRes, statsRes, attendanceRes] = await Promise.allSettled([
           getProfile(),
@@ -60,19 +60,23 @@ export default function EmployeeDashboard() {
         if (!isMounted) return;
 
         if (profileRes.status === 'fulfilled') {
+          // Backend: { success, message, data: { user_id, name, department, ... } }
           const profileData = profileRes.value.data?.data;
           setProfile(profileData);
           if (profileData?.name) {
             setUser((prev) => ({ ...prev, name: profileData.name }));
           }
         }
+
         if (statsRes.status === 'fulfilled') {
+          // Backend: { success, message, data: { year, month, total_days, present, on_time, late, absent, records } }
           setStats(statsRes.value.data?.data);
         }
+
         if (attendanceRes.status === 'fulfilled') {
-          const raw = attendanceRes.value.data?.data;
-          const list = Array.isArray(raw) ? raw : raw?.records || [];
-          setLogs(list.slice(-3).reverse());
+          // Backend: { success, message, data: { user_id, start_date, end_date, total, records } }
+          const list = attendanceRes.value.data?.data?.records ?? [];
+          setLogs(Array.isArray(list) ? list.slice(-3).reverse() : []);
         }
 
         if (
@@ -82,7 +86,7 @@ export default function EmployeeDashboard() {
         ) {
           setErrorMsg('Không thể tải dữ liệu bảng điều khiển. Vui lòng thử lại sau.');
         }
-      } catch (err) {
+      } catch {
         if (isMounted) setErrorMsg('Đã xảy ra lỗi khi tải dữ liệu.');
       } finally {
         if (isMounted) setLoading(false);
@@ -90,19 +94,16 @@ export default function EmployeeDashboard() {
     }
 
     load();
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const displayName = profile?.name || user?.name || 'Nhân viên';
 
-  // stats shape from backend: { year, month, total_days, present, on_time, late, absent, records }
-  const workedDays = stats?.present ?? '--';
-  const totalDays = stats?.total_days ?? '--';
-  const lateCount = stats?.late ?? '--';
-  const leaveRemaining = stats?.absent ?? '--';
+  const workedDays    = stats?.present    ?? '--';
+  const totalDays     = stats?.total_days ?? '--';
+  const lateCount     = stats?.late       ?? '--';
+  const leaveRemaining = stats?.absent    ?? '--';
 
   const progress =
     typeof workedDays === 'number' && typeof totalDays === 'number' && totalDays > 0
@@ -114,7 +115,7 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="page">
-      <TopNav showRoleSwitch={user?.role === 'manager'} />
+      <TopNav />
       <div className="page__body">
         <Sidebar />
         <main className="ed">
@@ -139,9 +140,7 @@ export default function EmployeeDashboard() {
               <svg width="64" height="64" viewBox="0 0 64 64">
                 <circle cx="32" cy="32" r="26" fill="none" stroke="#e6e9ed" strokeWidth="6" />
                 <circle
-                  cx="32"
-                  cy="32"
-                  r="26"
+                  cx="32" cy="32" r="26"
                   fill="none"
                   stroke="var(--color-accent)"
                   strokeWidth="6"
@@ -162,8 +161,7 @@ export default function EmployeeDashboard() {
               </div>
               <div className="ed__stat-label">Đi muộn/Về sớm</div>
               <div className="ed__stat-value ed__stat-value--red">
-                {lateCount}
-                {lateCount !== '--' ? ' lần' : ''}
+                {lateCount}{lateCount !== '--' ? ' lần' : ''}
               </div>
             </div>
             <div className="ed__stat-card">
@@ -172,8 +170,7 @@ export default function EmployeeDashboard() {
               </div>
               <div className="ed__stat-label">Ngày vắng (tháng này)</div>
               <div className="ed__stat-value ed__stat-value--blue">
-                {leaveRemaining}
-                {leaveRemaining !== '--' ? ' ngày' : ''}
+                {leaveRemaining}{leaveRemaining !== '--' ? ' ngày' : ''}
               </div>
             </div>
           </div>
@@ -193,37 +190,30 @@ export default function EmployeeDashboard() {
 
             {loading ? (
               <div className="ed__skeleton-list">
-                {[0, 1, 2].map((i) => (
-                  <div className="ed__skeleton-row" key={i} />
-                ))}
+                {[0, 1, 2].map((i) => <div className="ed__skeleton-row" key={i} />)}
               </div>
             ) : logs.length === 0 ? (
               <div className="ed__empty">Chưa có dữ liệu chấm công gần đây.</div>
             ) : (
               <ul className="ed__log-list">
                 {logs.map((log, idx) => {
-                  const hasCheckin = !!log.timestamp;
+                  const hasCheckin  = !!log.timestamp;
                   const hasCheckout = !!log.checkout_time;
-                  const status = log.status || (log.gps_ok === 'false' ? 'Thất bại' : 'Thành công');
-                  const label = hasCheckout ? 'Ra ca' : hasCheckin ? 'Vào ca' : 'Vắng mặt';
-                  const location =
-                    log.lat && log.lng ? `${log.lat}, ${log.lng}` : 'Không xác định';
-                  const time =
-                    (hasCheckout ? log.checkout_time : log.timestamp)
-                      ? new Date(
-                          (hasCheckout ? log.checkout_time : log.timestamp).replace(' ', 'T')
-                        ).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                      : '--:--';
+                  const label  = hasCheckout ? 'Ra ca' : hasCheckin ? 'Vào ca' : 'Vắng mặt';
+                  const status = log.status || 'Không rõ';
+                  const timeStr = (hasCheckout ? log.checkout_time : log.timestamp)
+                    ? new Date(
+                        (hasCheckout ? log.checkout_time : log.timestamp).replace(' ', 'T')
+                      ).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
                   return (
                     <li className="ed__log-row" key={idx}>
                       <span className={`ed__log-dot ${idx === 0 ? 'ed__log-dot--active' : ''}`} />
                       <div className="ed__log-content">
-                        <div className="ed__log-title">
-                          {label} - {status}
-                        </div>
-                        <div className="ed__log-sub">{location}</div>
+                        <div className="ed__log-title">{label} — {status}</div>
+                        <div className="ed__log-sub">{log.date || ''}</div>
                       </div>
-                      <div className="ed__log-time">{time}</div>
+                      <div className="ed__log-time">{timeStr}</div>
                     </li>
                   );
                 })}
@@ -233,7 +223,7 @@ export default function EmployeeDashboard() {
         </main>
       </div>
 
-      <button className="ed__fab" onClick={() => navigate('/diem-danh')} aria-label="Mở bản đồ điểm danh">
+      <button className="ed__fab" onClick={() => navigate('/diem-danh')} aria-label="Điểm danh">
         <Map size={22} strokeWidth={2} />
       </button>
     </div>
