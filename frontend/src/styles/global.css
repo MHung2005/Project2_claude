@@ -1,0 +1,80 @@
+:root {
+  --color-navy-900: #0b1e36;
+  --color-navy-800: #0f2742;
+  --color-ink: #0c1b2e;
+  --color-accent: #16a34a;
+  --color-accent-light: #6ee7a0;
+  --color-accent-soft: #e7f8ee;
+  --color-bg: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-border: #e4e8ed;
+  --color-text: #0c1b2e;
+  --color-text-muted: #6b7785;
+  --color-text-faint: #9aa5b1;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fdecec;
+  --color-warning-soft: #fdecec;
+  --color-blue: #2563eb;
+
+  --font-display: 'Sora', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-card: 0 1px 2px rgba(12, 27, 46, 0.04), 0 8px 24px rgba(12, 27, 46, 0.04);
+  --shadow-pop: 0 12px 32px rgba(12, 27, 46, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--color-accent-light);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d6dce2;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

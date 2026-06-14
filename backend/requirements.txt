@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+redis
+numpy
+opencv-python-headless
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+openpyxl
+insightface
+onnxruntime

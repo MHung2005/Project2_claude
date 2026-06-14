@@ -1,0 +1,246 @@
+.ci {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 48px 24px 64px;
+}
+
+.ci__center {
+  width: 100%;
+  max-width: 540px;
+  text-align: center;
+}
+
+.ci__clock {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ci__date {
+  color: var(--color-text-muted);
+  font-size: 15px;
+  margin: 4px 0 28px;
+}
+
+.ci__map {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #15212f;
+  margin-bottom: 24px;
+}
+
+.ci__map-bg {
+  height: 220px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(110, 231, 160, 0.25), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 36px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 36px),
+    #131e2c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.ci__map-ping {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.ci__map-dot {
+  position: absolute;
+  inset: 0;
+  background: #3b9eff;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(59, 158, 255, 0.25);
+}
+
+.ci__map-pulse {
+  position: absolute;
+  inset: -40px;
+  border: 1px solid rgba(110, 231, 160, 0.5);
+  border-radius: 50%;
+  animation: ci-pulse 2.4s ease-out infinite;
+}
+
+@keyframes ci-pulse {
+  0% { transform: scale(0.4); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.ci__map-info {
+  background: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.ci__map-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.ci__map-value {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.ci__gps-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.ci__gps-badge--error {
+  color: var(--color-danger);
+}
+
+.ci__camera-wrap {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.ci__camera {
+  width: 240px;
+  height: 240px;
+  margin: 0 auto 14px;
+  border: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #1a2434;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ci__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.ci__camera-error {
+  color: #cbd5e1;
+  font-size: 13px;
+  padding: 20px;
+}
+
+.ci__camera-caption {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.ci__mode-switch {
+  display: flex;
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 4px;
+  margin: 0 auto 20px;
+  max-width: 240px;
+}
+
+.ci__mode-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.ci__mode-btn--active {
+  background: var(--color-ink);
+  color: #fff;
+}
+
+.ci__result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+
+.ci__result--success {
+  background: var(--color-accent-soft);
+  color: #14532d;
+}
+
+.ci__result--error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.ci__submit {
+  width: 100%;
+  background: var(--color-ink);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  font-size: 15.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.ci__submit:hover {
+  opacity: 0.92;
+}
+
+.ci__submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ci__spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .ci__camera {
+    width: 200px;
+    height: 200px;
+  }
+  .ci__map-value {
+    max-width: 160px;
+  }
+}
