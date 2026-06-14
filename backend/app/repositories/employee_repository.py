@@ -144,7 +144,13 @@ class EmployeeRepository:
         if not user_id:
             return None
         data = self.redis.hgetall(f"employee:{user_id.decode()}")
-        return {k.decode(): v.decode() for k, v in data.items()}
+        result = {}
+        for k, v in data.items():
+            key = k.decode()
+            if key == "vector_embedding":
+                continue  # skip binary field
+            result[key] = v.decode()
+        return result
 
     # ── VECTOR SEARCH (kept for manager use, not for checkin) ────────
     def search_by_vector(self, query_vector, top_k: int = 1) -> dict | None:

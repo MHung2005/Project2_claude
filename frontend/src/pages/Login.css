@@ -124,6 +124,10 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
+.login__input--has-toggle {
+  padding-right: 44px;
+}
+
 .login__input::placeholder {
   color: var(--color-text-faint);
 }
@@ -132,6 +136,24 @@
   outline: none;
   border-color: var(--color-accent);
   background: #fff;
+}
+
+.login__eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-faint);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.login__eye-btn:hover {
+  color: var(--color-ink);
 }
 
 .login__remember {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, ScanFace, MapPin } from 'lucide-react';
+import { User, Lock, ScanFace, MapPin, Eye, EyeOff } from 'lucide-react';
 import { loginEmployee, loginManager } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -10,6 +10,7 @@ export default function Login() {
   const [mode, setMode] = useState('employee'); // 'employee' | 'manager'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -114,13 +115,22 @@ export default function Login() {
             <Lock size={18} strokeWidth={1.8} className="login__input-icon" />
             <input
               id="password"
-              className="login__input"
-              type="password"
+              className="login__input login__input--has-toggle"
+              type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
             />
+            <button
+              type="button"
+              className="login__eye-btn"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
 
           <label className="login__remember">
