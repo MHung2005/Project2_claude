@@ -28,7 +28,8 @@ export default function StatsPage() {
     getAttendance(range.start, range.end)
       .then(({ data }) => {
         if (!isMounted) return;
-        const list = Array.isArray(data) ? data : data?.items || data?.records || [];
+        const payload = data?.data;
+        const list = Array.isArray(payload) ? payload : payload?.records || [];
         setRecords(list);
       })
       .catch(() => {
@@ -92,16 +93,30 @@ export default function StatsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((rec, idx) => (
-                    <tr key={idx}>
-                      <td>{rec.date || rec.day || '—'}</td>
-                      <td className="sp__muted">{rec.checkin_time || rec.check_in || '--:--'}</td>
-                      <td className="sp__muted">{rec.checkout_time || rec.check_out || '--:--'}</td>
-                      <td>
-                        <span className="sp__badge">{rec.status || 'Đúng giờ'}</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {records.map((rec, idx) => {
+                    const checkinTime = rec.timestamp
+                      ? new Date(rec.timestamp.replace(' ', 'T')).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '--:--';
+                    const checkoutTime = rec.checkout_time
+                      ? new Date(rec.checkout_time.replace(' ', 'T')).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '--:--';
+                    return (
+                      <tr key={idx}>
+                        <td>{rec.date || '—'}</td>
+                        <td className="sp__muted">{rec.timestamp ? checkinTime : '--:--'}</td>
+                        <td className="sp__muted">{rec.checkout_time ? checkoutTime : '--:--'}</td>
+                        <td>
+                          <span className="sp__badge">{rec.status || 'Vắng mặt'}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

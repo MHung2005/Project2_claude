@@ -45,14 +45,15 @@ export default function BulkImport() {
     setSubmitting(true);
     setResult(null);
     try {
-      const { data } = await bulkImportEmployees(file);
+      const { data: payload } = await bulkImportEmployees(file);
+      const data = payload?.data;
       setResult(data);
       showToast(
-        `Tạo tài khoản thành công: ${data?.created ?? 0}, bỏ qua: ${data?.skipped ?? 0}.`,
+        `Tạo tài khoản thành công: ${data?.created_count ?? 0}, bỏ qua: ${data?.skipped_count ?? 0}.`,
         'success'
       );
     } catch (err) {
-      const detail = err?.response?.data?.detail;
+      const detail = err?.response?.data?.message || err?.response?.data?.detail;
       const message = Array.isArray(detail)
         ? detail.map((d) => d.msg).join(', ')
         : detail || 'Tải file thất bại. Vui lòng kiểm tra định dạng và thử lại.';
@@ -180,16 +181,16 @@ export default function BulkImport() {
                   </div>
                 )}
 
-                {result && !result.error && (result.created || result.skipped || result.errors) && (
+                {result && !result.error && (
                   <div className="bi__summary">
-                    {typeof result.created === 'number' && (
+                    {typeof result.created_count === 'number' && (
                       <div className="bi__summary-item bi__summary-item--success">
-                        <CheckCircle2 size={16} strokeWidth={2.2} /> Đã tạo: {result.created}
+                        <CheckCircle2 size={16} strokeWidth={2.2} /> Đã tạo: {result.created_count}
                       </div>
                     )}
-                    {typeof result.skipped === 'number' && (
+                    {typeof result.skipped_count === 'number' && (
                       <div className="bi__summary-item">
-                        Đã bỏ qua: {result.skipped}
+                        Đã bỏ qua: {result.skipped_count}
                       </div>
                     )}
                     {Array.isArray(result.errors) && result.errors.length > 0 && (

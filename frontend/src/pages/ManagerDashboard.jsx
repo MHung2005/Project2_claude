@@ -40,10 +40,10 @@ export default function ManagerDashboard() {
       .then(([analyticsRes, statsRes]) => {
         if (!isMounted) return;
         if (analyticsRes.status === 'fulfilled') {
-          setAnalytics(analyticsRes.value.data);
+          setAnalytics(analyticsRes.value.data?.data);
         }
         if (statsRes.status === 'fulfilled') {
-          setStats(statsRes.value.data);
+          setStats(statsRes.value.data?.data);
         }
         if (analyticsRes.status === 'rejected' && statsRes.status === 'rejected') {
           setErrorMsg('Không thể tải dữ liệu tổng quan. Vui lòng thử lại sau.');
@@ -62,39 +62,39 @@ export default function ManagerDashboard() {
     setPage(0);
   }, [search]);
 
+  // analytics shape: { date, total_employees, present, on_time, late, absent, records }
   const records = useMemo(() => {
-    const raw = analytics?.records || analytics?.items || analytics?.list || [];
+    const raw = analytics?.records || [];
     return Array.isArray(raw) ? raw : [];
   }, [analytics]);
 
-  const totalRecords = analytics?.total ?? records.length;
+  const totalRecords = records.length;
   const pageCount = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
   const pagedRecords = records.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
+  // Build department breakdown locally — backend doesn't return this directly
   const deptBreakdown = useMemo(() => {
-    const raw = analytics?.department_breakdown || analytics?.by_department || stats?.department_breakdown;
-    if (Array.isArray(raw)) {
-      return raw.map((d) => ({
-        name: d.department || d.name,
-        value: d.count ?? d.value ?? d.percent ?? 0,
-      }));
-    }
-    if (raw && typeof raw === 'object') {
-      return Object.entries(raw).map(([name, value]) => ({ name, value }));
-    }
-    return [];
-  }, [analytics, stats]);
+    const counts = {};
+    records.forEach((r) => {
+      if (r.status !== 'Vắng mặt') {
+        const dept = r.department || 'Khác';
+        counts[dept] = (counts[dept] || 0) + 1;
+      }
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [records]);
 
-  const totalCount = useMemo(() => {
-    if (analytics?.total_count) return analytics.total_count;
-    return deptBreakdown.reduce((sum, d) => sum + (d.value || 0), 0);
-  }, [analytics, deptBreakdown]);
+  const totalCount = useMemo(
+    () => deptBreakdown.reduce((sum, d) => sum + (d.value || 0), 0),
+    [deptBreakdown]
+  );
 
-  const onTimeRate = analytics?.on_time_rate ?? stats?.on_time_rate ?? stats?.onTimeRate;
-  const checkedIn = analytics?.checked_in ?? stats?.checked_in ?? stats?.present_today;
-  const lateCount = analytics?.late_count ?? stats?.late_count ?? stats?.late_today;
-  const notCheckedIn = analytics?.not_checked_in ?? stats?.not_checked_in ?? stats?.absent_today;
-  const totalStaff = stats?.total_staff ?? stats?.total_employees;
+  // stats shape: { today, total, absent, late, on_time, rate }
+  const onTimeRate = stats?.rate;
+  const checkedIn = analytics?.present ?? stats?.today;
+  const lateCount = analytics?.late ?? stats?.late;
+  const notCheckedIn = analytics?.absent ?? stats?.absent;
+  const totalStaff = analytics?.total_employees ?? stats?.total;
 
   return (
     <div className="page">
@@ -187,7 +187,7 @@ export default function ManagerDashboard() {
                         startAngle={90}
                         endAngle={-270}
                       >
-                        {deptBreakdown.map((entry, idx) => (
+                        {deptBreakdown.map((entry) => (
                           <Cell
                             key={entry.name}
                             fill={DEPT_COLORS[entry.name] || DEPT_COLORS.default}
@@ -259,24 +259,30 @@ export default function ManagerDashboard() {
                       </tr>
                     ) : (
                       pagedRecords.map((rec, idx) => {
-                        const name = rec.name || rec.full_name || '—';
+                        const name = rec.name || '—';
                         const dept = rec.department || '—';
-                        const time = rec.time || rec.checkin_time || '--:--:--';
+                        const time = rec.checkin_time
+                          ? new Date(rec.checkin_time.replace(' ', 'T')).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })
+                          : '--:--:--';
                         const statusRaw = (rec.status || '').toLowerCase();
                         let statusLabel = rec.status || 'Chưa Check-in';
                         let statusClass = 'md__badge--muted';
-                        if (statusRaw.includes('late') || statusRaw.includes('muộn')) {
+                        if (statusRaw.includes('muộn')) {
                           statusLabel = 'Đi muộn';
                           statusClass = 'md__badge--danger';
-                        } else if (statusRaw.includes('on') || statusRaw.includes('đúng')) {
+                        } else if (statusRaw.includes('đúng')) {
                           statusLabel = 'Đúng giờ';
                           statusClass = 'md__badge--success';
-                        } else if (!rec.status || statusRaw === '' || statusRaw.includes('none') || statusRaw.includes('chưa')) {
-                          statusLabel = 'Chưa Check-in';
+                        } else if (statusRaw.includes('vắng') || !rec.status) {
+                          statusLabel = 'Vắng mặt';
                           statusClass = 'md__badge--muted';
                         }
                         return (
-                          <tr key={idx}>
+                          <tr key={rec.user_id || idx}>
                             <td>
                               <div className="md__person">
                                 <span className="md__avatar" />

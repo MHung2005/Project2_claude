@@ -60,17 +60,18 @@ export default function EmployeeDashboard() {
         if (!isMounted) return;
 
         if (profileRes.status === 'fulfilled') {
-          setProfile(profileRes.value.data);
-          if (profileRes.value.data?.name) {
-            setUser((prev) => ({ ...prev, name: profileRes.value.data.name }));
+          const profileData = profileRes.value.data?.data;
+          setProfile(profileData);
+          if (profileData?.name) {
+            setUser((prev) => ({ ...prev, name: profileData.name }));
           }
         }
         if (statsRes.status === 'fulfilled') {
-          setStats(statsRes.value.data);
+          setStats(statsRes.value.data?.data);
         }
         if (attendanceRes.status === 'fulfilled') {
-          const raw = attendanceRes.value.data;
-          const list = Array.isArray(raw) ? raw : raw?.items || raw?.records || [];
+          const raw = attendanceRes.value.data?.data;
+          const list = Array.isArray(raw) ? raw : raw?.records || [];
           setLogs(list.slice(-3).reverse());
         }
 
@@ -96,10 +97,12 @@ export default function EmployeeDashboard() {
   }, []);
 
   const displayName = profile?.name || user?.name || 'Nhân viên';
-  const workedDays = stats?.worked_days ?? stats?.days_present ?? stats?.attended_days ?? '--';
-  const totalDays = stats?.total_days ?? stats?.working_days ?? '--';
-  const lateCount = stats?.late_count ?? stats?.late_early_count ?? stats?.late ?? '--';
-  const leaveRemaining = stats?.leave_remaining ?? stats?.remaining_leave ?? stats?.leave_days_left ?? '--';
+
+  // stats shape from backend: { year, month, total_days, present, on_time, late, absent, records }
+  const workedDays = stats?.present ?? '--';
+  const totalDays = stats?.total_days ?? '--';
+  const lateCount = stats?.late ?? '--';
+  const leaveRemaining = stats?.absent ?? '--';
 
   const progress =
     typeof workedDays === 'number' && typeof totalDays === 'number' && totalDays > 0
@@ -167,7 +170,7 @@ export default function EmployeeDashboard() {
               <div className="ed__stat-icon ed__stat-icon--blue">
                 <PlaneTakeoff size={20} strokeWidth={2} />
               </div>
-              <div className="ed__stat-label">Ngày phép còn lại</div>
+              <div className="ed__stat-label">Ngày vắng (tháng này)</div>
               <div className="ed__stat-value ed__stat-value--blue">
                 {leaveRemaining}
                 {leaveRemaining !== '--' ? ' ngày' : ''}
@@ -199,15 +202,18 @@ export default function EmployeeDashboard() {
             ) : (
               <ul className="ed__log-list">
                 {logs.map((log, idx) => {
-                  const isCheckin = (log.type || log.action || '').toLowerCase().includes('in');
-                  const status = log.status || (log.valid === false ? 'Thất bại' : 'Thành công');
-                  const label = isCheckin ? 'Vào ca' : 'Ra ca';
-                  const location = log.location || log.address || (log.lat && log.lng ? `${log.lat}, ${log.lng}` : 'Không xác định');
+                  const hasCheckin = !!log.timestamp;
+                  const hasCheckout = !!log.checkout_time;
+                  const status = log.status || (log.gps_ok === 'false' ? 'Thất bại' : 'Thành công');
+                  const label = hasCheckout ? 'Ra ca' : hasCheckin ? 'Vào ca' : 'Vắng mặt';
+                  const location =
+                    log.lat && log.lng ? `${log.lat}, ${log.lng}` : 'Không xác định';
                   const time =
-                    log.time ||
-                    (log.timestamp
-                      ? new Date(log.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                      : '--:--');
+                    (hasCheckout ? log.checkout_time : log.timestamp)
+                      ? new Date(
+                          (hasCheckout ? log.checkout_time : log.timestamp).replace(' ', 'T')
+                        ).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                      : '--:--';
                   return (
                     <li className="ed__log-row" key={idx}>
                       <span className={`ed__log-dot ${idx === 0 ? 'ed__log-dot--active' : ''}`} />

@@ -28,7 +28,8 @@ export default function Login() {
     setLoading(true);
     try {
       const apiCall = mode === 'manager' ? loginManager : loginEmployee;
-      const { data } = await apiCall(username, password);
+      const { data: payload } = await apiCall(username, password);
+      const data = payload?.data;
 
       const token = data?.access_token || data?.token;
       if (!token) {
@@ -36,13 +37,17 @@ export default function Login() {
       }
 
       const role = data?.role || mode;
-      const user = data?.user || { name: data?.name, username };
+      const user = data?.user || {
+        name: data?.name,
+        username: data?.username || username,
+        user_id: data?.user_id,
+      };
 
       login(token, role, user);
       showToast('Đăng nhập thành công', 'success');
       navigate(role === 'manager' ? '/quan-ly' : '/trang-chu');
     } catch (err) {
-      const detail = err?.response?.data?.detail;
+      const detail = err?.response?.data?.message || err?.response?.data?.detail;
       const message = Array.isArray(detail)
         ? detail.map((d) => d.msg).join(', ')
         : detail || 'Tên đăng nhập hoặc mật khẩu không đúng.';
