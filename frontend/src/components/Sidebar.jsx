@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   Home,
+  User,
   Lock,
   ScanFace,
   Fingerprint,
@@ -11,9 +12,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
-// Employee: 5 chức năng
+// Employee: 6 chức năng
 const employeeLinks = [
   { to: '/trang-chu',          label: 'Trang chủ',           icon: Home        },
+  { to: '/ho-so-ca-nhan',      label: 'Hồ sơ cá nhân',        icon: User        },
   { to: '/doi-mat-khau',       label: 'Thay đổi mật khẩu',  icon: Lock        },
   { to: '/dang-ky-khuon-mat',  label: 'Đăng ký khuôn mặt',  icon: ScanFace    },
   { to: '/diem-danh',          label: 'Điểm danh',           icon: Fingerprint },

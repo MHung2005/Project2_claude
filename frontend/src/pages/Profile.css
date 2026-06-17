@@ -1,0 +1,249 @@
+.pf {
+  flex: 1;
+  padding: 32px 40px 80px;
+  max-width: 860px;
+}
+
+.pf__header {
+  margin-bottom: 24px;
+}
+
+.pf__title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--color-ink);
+}
+
+.pf__subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+}
+
+.pf__alert {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.pf__profile-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.pf__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+
+.pf__profile-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf__name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pf__role-line {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.pf__biometric-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pf__biometric-badge--ok {
+  background: var(--color-accent-soft);
+  color: #15803d;
+}
+
+.pf__biometric-badge--warn {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.pf__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+
+.pf__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+}
+
+.pf__card-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 18px;
+  color: var(--color-ink);
+}
+
+.pf__field-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pf__field-row,
+.pf__status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pf__field-list .pf__field-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pf__card--side .pf__status-row:last-of-type {
+  border-bottom: none;
+}
+
+.pf__field-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf__field-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf__field-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.pf__field-value {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.pf__field-value--accent {
+  color: var(--color-accent);
+}
+
+.pf__field-value--danger {
+  color: var(--color-danger);
+}
+
+.pf__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pf__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border-radius: var(--radius-md);
+  padding: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.pf__action-btn:hover {
+  background: var(--color-bg);
+}
+
+.pf__action-btn--primary {
+  background: var(--color-ink);
+  color: #fff;
+  border-color: var(--color-ink);
+}
+
+.pf__action-btn--primary:hover {
+  opacity: 0.92;
+  background: var(--color-ink);
+}
+
+.pf__skeleton-card {
+  height: 320px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, #f0f2f5 25%, #f8f9fb 50%, #f0f2f5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (max-width: 900px) {
+  .pf__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .pf {
+    padding: 20px 16px 64px;
+  }
+  .pf__profile-card {
+    flex-wrap: wrap;
+  }
+}

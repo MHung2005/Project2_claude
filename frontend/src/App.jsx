@@ -7,6 +7,7 @@ import ChangePassword from './pages/ChangePassword';
 import FaceRegister from './pages/FaceRegister';
 import CheckIn from './pages/CheckIn';
 import StatsPage from './pages/StatsPage';
+import Profile from './pages/Profile';
 import ManagerDashboard from './pages/ManagerDashboard';
 import BulkImport from './pages/BulkImport';
 import EmployeeDashboard from './pages/EmployeeDashboard';
@@ -33,6 +34,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="employee">
                   <EmployeeDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ho-so-ca-nhan"
+              element={
+                <ProtectedRoute role="employee">
+                  <Profile />
                 </ProtectedRoute>
               }
             />
