@@ -8,6 +8,7 @@ import {
   BarChart3,
   BarChart2,
   UserPlus,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
@@ -22,9 +23,10 @@ const employeeLinks = [
   { to: '/thong-ke',           label: 'Thống kê',            icon: BarChart3   },
 ];
 
-// Manager: 2 chức năng
+// Manager: 3 chức năng
 const managerLinks = [
   { to: '/cap-tai-khoan', label: 'Cấp tài khoản nhân viên', icon: UserPlus  },
+  { to: '/cau-hinh-gps',  label: 'Cấu hình GPS điểm danh',  icon: MapPin   },
   { to: '/quan-ly',       label: 'Xem thống kê',            icon: BarChart2 },
 ];
 

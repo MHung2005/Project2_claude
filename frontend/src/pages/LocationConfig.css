@@ -1,0 +1,505 @@
+.lc {
+  flex: 1;
+  padding: 32px 40px 80px;
+  max-width: 980px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.lc__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.lc__header-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lc__title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--color-ink);
+}
+
+.lc__subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+}
+
+.lc__alert {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+.lc__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.lc__form-col,
+.lc__preview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────── */
+.lc__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px 28px;
+}
+
+.lc__card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: 14px;
+}
+
+.lc__card-title--mt {
+  margin-top: 24px;
+}
+
+/* ── Locate me button ─────────────────────────────────────────────── */
+.lc__locate-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px;
+  border-radius: var(--radius-md);
+  border: 1.5px dashed var(--color-accent);
+  background: var(--color-accent-soft);
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  margin-bottom: 16px;
+}
+
+.lc__locate-btn:hover {
+  background: #d0f5e0;
+}
+
+.lc__locate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Divider ──────────────────────────────────────────────────────── */
+.lc__divider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lc__divider-row::before,
+.lc__divider-row::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.lc__divider-text {
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ── Coord fields ─────────────────────────────────────────────────── */
+.lc__field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.lc__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.lc__input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  font-size: 14px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.lc__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: #fff;
+}
+
+.lc__input:disabled {
+  opacity: 0.6;
+}
+
+.lc__hint {
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+}
+
+/* ── Radius ───────────────────────────────────────────────────────── */
+.lc__radius-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lc__input--radius {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.lc__radius-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lc__preset {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.lc__preset:hover {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.lc__preset--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: #15803d;
+}
+
+/* Slider */
+.lc__slider {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+  margin-bottom: 4px;
+}
+
+.lc__slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-bottom: 4px;
+}
+
+/* ── Save button ──────────────────────────────────────────────────── */
+.lc__save-btn {
+  width: 100%;
+  background: var(--color-ink);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-top: 24px;
+  transition: opacity 0.15s ease, background 0.2s ease;
+}
+
+.lc__save-btn:hover {
+  opacity: 0.92;
+}
+
+.lc__save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ── Map visual card ──────────────────────────────────────────────── */
+.lc__map-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.lc__map-bg {
+  height: 240px;
+  background: #131e2c;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.lc__map-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lc__map-center {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Radius ring */
+.lc__map-ring {
+  position: absolute;
+  border: 1.5px solid rgba(110, 231, 160, 0.35);
+  background: rgba(110, 231, 160, 0.06);
+  transform: translate(-50%, -50%);
+  left: 50%;
+  top: 50%;
+  transition: width 0.4s ease, height 0.4s ease;
+}
+
+.lc__map-ring-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(110, 231, 160, 0.7);
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+/* Pulse animation */
+.lc__map-pulse {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border: 1px solid rgba(110, 231, 160, 0.5);
+  border-radius: 50%;
+  animation: lc-pulse 2.4s ease-out infinite;
+}
+
+@keyframes lc-pulse {
+  0%   { transform: scale(0.4); opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Center dot */
+.lc__map-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  z-index: 2;
+}
+
+.lc__map-dot-inner {
+  position: absolute;
+  inset: 0;
+  background: #3b9eff;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(59, 158, 255, 0.25);
+}
+
+/* Empty state */
+.lc__map-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #4e6580;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+/* Map footer */
+.lc__map-footer {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  background: #fff;
+  gap: 0;
+}
+
+.lc__map-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc__map-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.lc__map-stat-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+}
+
+.lc__map-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--color-border);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+/* ── Distance check card ──────────────────────────────────────────── */
+.lc__distance-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid;
+}
+
+.lc__distance-card--ok {
+  background: var(--color-accent-soft);
+  border-color: #a7f3c0;
+  color: #15803d;
+}
+
+.lc__distance-card--warn {
+  background: var(--color-danger-soft);
+  border-color: #fbd5d5;
+  color: var(--color-danger);
+}
+
+.lc__distance-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.lc__distance-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.lc__distance-sub {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* ── Info card ────────────────────────────────────────────────────── */
+.lc__info-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+
+.lc__info-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: 12px;
+}
+
+.lc__info-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc__info-list li {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ── Spin ─────────────────────────────────────────────────────────── */
+.lc__spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .lc__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .lc {
+    padding: 20px 16px 64px;
+  }
+
+  .lc__field-group {
+    grid-template-columns: 1fr;
+  }
+}

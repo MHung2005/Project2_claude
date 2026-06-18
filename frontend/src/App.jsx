@@ -11,6 +11,7 @@ import Profile from './pages/Profile';
 import ManagerDashboard from './pages/ManagerDashboard';
 import BulkImport from './pages/BulkImport';
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import LocationConfig from './pages/LocationConfig';
 import './styles/global.css';
 
 function RootRedirect() {
@@ -92,6 +93,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="manager">
                   <BulkImport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cau-hinh-gps"
+              element={
+                <ProtectedRoute role="manager">
+                  <LocationConfig />
                 </ProtectedRoute>
               }
             />
