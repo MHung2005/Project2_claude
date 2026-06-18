@@ -3,20 +3,52 @@ import {
   UploadCloud, FileSpreadsheet, Download, UserPlus,
   CheckCircle2, XCircle, Loader2, Info,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import TopNav from '../components/TopNav';
 import Sidebar from '../components/Sidebar';
 import { bulkImportEmployees } from '../services/managerService';
 import { useToast } from '../components/Toast';
 import './BulkImport.css';
 
-// Tạo file CSV mẫu với cột password
-const SAMPLE_CSV =
-  'user_id,name,department,position,username,password\n' +
-  'NV001,Nguyễn Văn A,Kỹ thuật,Lập trình viên,nguyen.van.a,Pass@123\n' +
-  'NV002,Trần Thị B,Kinh doanh,Nhân viên kinh doanh,tran.thi.b,Pass@456\n';
+// ── Tạo file XLSX mẫu bằng SheetJS ──────────────────────────────────────
+function downloadSampleXlsx() {
+  const sampleData = [
+    {
+      user_id:    'NV001',
+      name:       'Nguyễn Văn A',
+      department: 'Kỹ thuật',
+      position:   'Lập trình viên',
+      username:   'nguyen.van.a',
+      password:   'Pass@123',
+    },
+    {
+      user_id:    'NV002',
+      name:       'Trần Thị B',
+      department: 'Kinh doanh',
+      position:   'Nhân viên kinh doanh',
+      username:   'tran.thi.b',
+      password:   'Pass@456',
+    },
+  ];
 
-const SAMPLE_URL =
-  'data:text/csv;charset=utf-8,' + encodeURIComponent(SAMPLE_CSV);
+  const worksheet = XLSX.utils.json_to_sheet(sampleData, {
+    header: ['user_id', 'name', 'department', 'position', 'username', 'password'],
+  });
+
+  // Đặt độ rộng cột cho dễ đọc
+  worksheet['!cols'] = [
+    { wch: 10 }, // user_id
+    { wch: 22 }, // name
+    { wch: 16 }, // department
+    { wch: 24 }, // position
+    { wch: 20 }, // username
+    { wch: 12 }, // password
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Nhân viên');
+  XLSX.writeFile(workbook, 'mau_nhan_vien.xlsx');
+}
 
 export default function BulkImport() {
   const [file, setFile]           = useState(null);
@@ -87,10 +119,16 @@ export default function BulkImport() {
               <div className="bi__card">
                 <div className="bi__card-header">
                   <h2>Tải lên danh sách</h2>
-                  <a className="bi__sample-link" href={SAMPLE_URL} download="mau_nhan_vien.csv">
+                  {/* Nút tải file mẫu XLSX — dùng SheetJS, không cần data URL */}
+                  <button
+                    type="button"
+                    className="bi__sample-link"
+                    onClick={downloadSampleXlsx}
+                    style={{background: 'none', border: 'none', color: '#4669e5', cursor: 'pointer'}}
+                  >
                     <Download size={14} strokeWidth={2.2} />
-                    Tải file mẫu
-                  </a>
+                    Tải file mẫu (.xlsx)
+                  </button>
                 </div>
 
                 <div
