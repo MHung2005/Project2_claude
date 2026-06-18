@@ -12,6 +12,7 @@ import ManagerDashboard from './pages/ManagerDashboard';
 import BulkImport from './pages/BulkImport';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import LocationConfig from './pages/LocationConfig';
+import EmployeeManager from './pages/EmployeeManager';
 import './styles/global.css';
 
 function RootRedirect() {
@@ -93,6 +94,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="manager">
                   <BulkImport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/nhan-vien"
+              element={
+                <ProtectedRoute role="manager">
+                  <EmployeeManager />
                 </ProtectedRoute>
               }
             />

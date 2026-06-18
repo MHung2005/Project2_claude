@@ -9,6 +9,7 @@ import {
   BarChart2,
   UserPlus,
   MapPin,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
@@ -23,11 +24,12 @@ const employeeLinks = [
   { to: '/thong-ke',           label: 'Thống kê',            icon: BarChart3   },
 ];
 
-// Manager: 3 chức năng
+// Manager: 4 chức năng
 const managerLinks = [
-  { to: '/cap-tai-khoan', label: 'Cấp tài khoản nhân viên', icon: UserPlus  },
-  { to: '/cau-hinh-gps',  label: 'Cấu hình GPS điểm danh',  icon: MapPin   },
-  { to: '/quan-ly',       label: 'Xem thống kê',            icon: BarChart2 },
+  { to: '/nhan-vien',     label: 'Quản lý nhân viên',        icon: Users    },
+  { to: '/cap-tai-khoan', label: 'Cấp tài khoản nhân viên',  icon: UserPlus },
+  { to: '/cau-hinh-gps',  label: 'Cấu hình GPS điểm danh',   icon: MapPin   },
+  { to: '/quan-ly',       label: 'Xem thống kê',             icon: BarChart2 },
 ];
 
 export default function Sidebar({ statusLabel }) {
