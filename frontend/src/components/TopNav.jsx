@@ -1,4 +1,5 @@
-import { Bell, Settings } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bell, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './TopNav.css';
@@ -8,14 +9,42 @@ export default function TopNav({ showRoleSwitch = false, showSettings = false })
   const location = useLocation();
   const navigate = useNavigate();
 
-  const initials = (user?.name || (isManager ? 'Quản lý' : 'User'))
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  const displayName = user?.name || (isManager ? 'Quản lý' : 'Nhân viên');
+  const initials = displayName
     .split(' ')
     .map((p) => p[0])
+    .filter(Boolean)
     .slice(-2)
     .join('')
     .toUpperCase();
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
+    setMenuOpen(false);
     logout();
     navigate('/login');
   };
@@ -42,17 +71,52 @@ export default function TopNav({ showRoleSwitch = false, showSettings = false })
       )}
 
       <div className="topnav__right">
-        <button className="topnav__icon-btn" aria-label="Thông báo">
+        <button className="topnav__icon-btn" aria-label="Thông báo" type="button">
           <Bell size={20} strokeWidth={1.8} />
         </button>
+
         {showSettings && (
-          <button className="topnav__icon-btn" aria-label="Cài đặt">
+          <button className="topnav__icon-btn" aria-label="Cài đặt" type="button">
             <Settings size={20} strokeWidth={1.8} />
           </button>
         )}
-        <button className="topnav__avatar" onClick={handleLogout} title="Đăng xuất">
-          {initials}
-        </button>
+
+        <div className="topnav__user" ref={menuRef}>
+          <button
+            type="button"
+            className="topnav__avatar-btn"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="true"
+            aria-expanded={menuOpen}
+            title={displayName}
+          >
+            <span className="topnav__avatar">{initials}</span>
+            <ChevronDown
+              size={15}
+              strokeWidth={2.2}
+              className={`topnav__chevron ${menuOpen ? 'topnav__chevron--open' : ''}`}
+            />
+          </button>
+
+          {menuOpen && (
+            <div className="topnav__menu" role="menu">
+              <div className="topnav__menu-header">
+                <div className="topnav__menu-name">{displayName}</div>
+                <div className="topnav__menu-role">{isManager ? 'Quản lý' : 'Nhân viên'}</div>
+              </div>
+              <div className="topnav__menu-divider" />
+              <button
+                type="button"
+                className="topnav__menu-item topnav__menu-item--danger"
+                onClick={handleLogout}
+                role="menuitem"
+              >
+                <LogOut size={16} strokeWidth={2} />
+                Đăng xuất
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
