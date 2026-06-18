@@ -8,9 +8,8 @@ import os
 
 
 class Settings:
-    # Redis
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    # SQLite — đường dẫn file CSDL (thay cho REDIS_HOST/REDIS_PORT cũ)
+    DB_PATH: str = os.getenv("DB_PATH", "data/facetime.db")
 
     # JWT
     SECRET_KEY: str = os.getenv("SECRET_KEY", "sk1234")
@@ -22,7 +21,7 @@ class Settings:
 
     # App
     APP_TITLE: str = "FaceTime & GPS Attendance API"
-    APP_VERSION: str = "3.0.0"
+    APP_VERSION: str = "4.0.0"  # bump: migrate Redis -> SQLite
 
 
 settings = Settings()

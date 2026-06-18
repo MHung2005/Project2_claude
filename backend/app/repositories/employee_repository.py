@@ -1,214 +1,227 @@
 """
-backend/app/repositories/employee_repository.py  (3NF Refactor)
+backend/app/repositories/employee_repository.py
 
-Ba entity riêng biệt, mỗi entity một prefix:
+Ba bảng quan hệ riêng biệt — tương ứng 3 entity Redis cũ:
 
-  [Entity 1] employee:{user_id}
+  [Bảng 1] employees
       user_id, name, department, position, email, phone
-      Chỉ chứa thông tin nhân sự thuần — KHÔNG có password/username/vector
+      Chỉ chứa thông tin nhân sự thuần — KHÔNG có password/username/vector.
 
-  [Entity 2] account:{user_id}
-      user_id, username, password_hash, role
-      account_index:{username} → user_id   (lookup ngược)
-      Tách biệt xác thực khỏi hồ sơ nhân sự
+  [Bảng 2] accounts
+      user_id (FK), username (UNIQUE), password_hash, role
+      Tách biệt xác thực khỏi hồ sơ nhân sự. UNIQUE(username) thay cho
+      account_index:{username} của Redid — và còn CHẶT hơn: CSDL quan hệ
+      tự đảm bảo không thể có 2 account trùng username (Redis cũ không
+      đảm bảo được điều này, set sau sẽ âm thầm đè set trước).
 
-  [Entity 3] face:{user_id}
-      user_id, vector_embedding (BINARY), registered_at
-      biometric_status được tính = "approved" nếu key tồn tại, else "none"
-      KHÔNG lưu trong employee hash → không còn transitive dependency
+  [Bảng 3] faces
+      user_id (FK), vector_embedding (BLOB), registered_at
+      biometric_status được derive = "approved" nếu có dòng face tương ứng.
+
+FOREIGN KEY ... ON DELETE CASCADE đảm nhiệm việc xoá cascade
+employee -> account/face mà bản Redis cũ phải tự code thủ công trong
+delete_employee().
 """
 
 from datetime import datetime
 
 import numpy as np
 
-from .redis_client import get_redis
+from .db import get_db, get_lock
 
-# Các field được phép đọc từ employee hash
 EMPLOYEE_TEXT_FIELDS = {"user_id", "name", "department", "position", "email", "phone"}
 
 
 class EmployeeRepository:
     def __init__(self):
-        self.redis = get_redis()
+        self.db = get_db()
+        self.lock = get_lock()
 
     # ════════════════════════════════════════════════════════════════
-    # ENTITY 1 — Employee (hồ sơ nhân sự thuần)
+    # BẢNG 1 — employees (hồ sơ nhân sự thuần)
     # ════════════════════════════════════════════════════════════════
 
     def create_employee(self, user_id: str, fields: dict) -> None:
-        """
-        Tạo hồ sơ nhân sự. Chỉ lưu các trường nhân sự — không có
-        thông tin xác thực hay sinh trắc học.
-        """
-        mapping = {
-            "user_id":    user_id.encode(),
-            "name":       fields.get("name", "").encode(),
-            "department": fields.get("department", "").encode(),
-            "position":   fields.get("position", "").encode(),
-            "email":      fields.get("email", "").encode(),
-            "phone":      fields.get("phone", "").encode(),
-        }
-        self.redis.hset(f"employee:{user_id}", mapping=mapping)
+        """Tạo (hoặc upsert) hồ sơ nhân sự. Không lưu xác thực/sinh trắc học."""
+        with self.lock:
+            self.db.execute(
+                """
+                INSERT INTO employees (user_id, name, department, position, email, phone)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    name       = excluded.name,
+                    department = excluded.department,
+                    position   = excluded.position,
+                    email      = excluded.email,
+                    phone      = excluded.phone
+                """,
+                (
+                    user_id,
+                    fields.get("name", ""),
+                    fields.get("department", ""),
+                    fields.get("position", ""),
+                    fields.get("email", ""),
+                    fields.get("phone", ""),
+                ),
+            )
 
     def update_employee(self, user_id: str, name: str, department: str, position: str) -> bool:
-        key = f"employee:{user_id}"
-        if not self.redis.exists(key):
-            return False
-        self.redis.hset(key, mapping={
-            "name":       name.encode(),
-            "department": department.encode(),
-            "position":   position.encode(),
-        })
-        return True
+        with self.lock:
+            cur = self.db.execute(
+                "UPDATE employees SET name = ?, department = ?, position = ? WHERE user_id = ?",
+                (name, department, position, user_id),
+            )
+            return cur.rowcount > 0
 
     def delete_employee(self, user_id: str) -> bool:
-        """Xóa employee + account + face — cascade."""
-        # Lấy username để xóa index ngược
-        account = self._get_account_raw(user_id)
-        if account:
-            username = account.get(b"username", b"").decode()
-            if username:
-                self.redis.delete(f"account_index:{username}")
-        deleted = self.redis.delete(f"employee:{user_id}") > 0
-        self.redis.delete(f"account:{user_id}")
-        self.redis.delete(f"face:{user_id}")
-        return deleted
+        """Xoá employee — accounts/faces tự xoá theo (ON DELETE CASCADE)."""
+        with self.lock:
+            cur = self.db.execute("DELETE FROM employees WHERE user_id = ?", (user_id,))
+            return cur.rowcount > 0
 
     def exists(self, user_id: str) -> bool:
-        return bool(self.redis.exists(f"employee:{user_id}"))
+        with self.lock:
+            row = self.db.execute(
+                "SELECT 1 FROM employees WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row is not None
 
     def get_raw(self, user_id: str) -> dict:
-        """Trả về raw bytes dict của employee hash."""
-        return self.redis.hgetall(f"employee:{user_id}")
+        with self.lock:
+            row = self.db.execute(
+                "SELECT * FROM employees WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return dict(row) if row else {}
 
     def get_employee(self, user_id: str) -> dict | None:
-        """Trả về thông tin nhân sự đã decode, kèm biometric_status tính toán."""
-        data = self.redis.hgetall(f"employee:{user_id}")
-        if not data:
-            return None
-        decoded = {
-            k.decode(): v.decode()
-            for k, v in data.items()
-            if k.decode() in EMPLOYEE_TEXT_FIELDS
-        }
-        # biometric_status là derived attribute — tính từ sự tồn tại của face key
-        decoded["biometric_status"] = (
-            "approved" if self.redis.exists(f"face:{user_id}") else "none"
-        )
+        """Trả về thông tin nhân sự, kèm biometric_status tính toán (derived)."""
+        with self.lock:
+            row = self.db.execute(
+                "SELECT user_id, name, department, position, email, phone "
+                "FROM employees WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            has_face = self.db.execute(
+                "SELECT 1 FROM faces WHERE user_id = ?", (user_id,)
+            ).fetchone() is not None
+
+        decoded = dict(row)
+        decoded["biometric_status"] = "approved" if has_face else "none"
         return decoded
 
     def get_all(self) -> list[dict]:
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT user_id, name, department, position, email, phone "
+                "FROM employees ORDER BY name"
+            ).fetchall()
+            face_ids = {
+                r["user_id"] for r in self.db.execute("SELECT user_id FROM faces").fetchall()
+            }
+
         employees = []
-        for key in self.redis.scan_iter("employee:*"):
-            try:
-                data = self.redis.hgetall(key)
-                if not data:
-                    continue
-                decoded = {}
-                for k, v in data.items():
-                    field = k.decode() if isinstance(k, bytes) else k
-                    if field in EMPLOYEE_TEXT_FIELDS:
-                        decoded[field] = v.decode() if isinstance(v, bytes) else v
-                if "user_id" not in decoded:
-                    continue
-                uid = decoded["user_id"]
-                decoded["biometric_status"] = (
-                    "approved" if self.redis.exists(f"face:{uid}") else "none"
-                )
-                employees.append(decoded)
-            except Exception as e:
-                print(f"[EmployeeRepository.get_all] Lỗi key '{key}': {e}")
+        for row in rows:
+            decoded = dict(row)
+            decoded["biometric_status"] = "approved" if decoded["user_id"] in face_ids else "none"
+            employees.append(decoded)
         return employees
 
     # ════════════════════════════════════════════════════════════════
-    # ENTITY 2 — Account (xác thực — tách biệt khỏi Employee)
+    # BẢNG 2 — accounts (xác thực — tách biệt khỏi employees)
     # ════════════════════════════════════════════════════════════════
 
     def attach_account(self, user_id: str, username: str, hashed_password: str,
                         role: str = "employee") -> None:
         """
         Tạo/cập nhật tài khoản xác thực cho employee.
-        Lưu tại account:{user_id} — KHÔNG lưu trong employee hash.
-        Tạo thêm index ngược account_index:{username} → user_id.
+        Yêu cầu employees.user_id đã tồn tại (FOREIGN KEY).
+        UNIQUE(username) sẽ raise sqlite3.IntegrityError nếu username đã
+        thuộc về user_id khác — caller (bulk import) đã có try/except để
+        bắt lỗi này theo từng dòng.
         """
-        self.redis.hset(f"account:{user_id}", mapping={
-            "user_id":       user_id.encode(),
-            "username":      username.encode(),
-            "password_hash": hashed_password.encode(),
-            "role":          role.encode(),
-        })
-        # Index ngược để login bằng username
-        self.redis.set(f"account_index:{username}", user_id.encode())
-
-    def _get_account_raw(self, user_id: str) -> dict:
-        return self.redis.hgetall(f"account:{user_id}")
+        with self.lock:
+            self.db.execute(
+                """
+                INSERT INTO accounts (user_id, username, password_hash, role)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username      = excluded.username,
+                    password_hash = excluded.password_hash,
+                    role          = excluded.role
+                """,
+                (user_id, username, hashed_password, role),
+            )
 
     def get_account_by_userid(self, user_id: str) -> dict | None:
-        data = self.redis.hgetall(f"account:{user_id}")
-        if not data:
-            return None
-        return {k.decode(): v.decode() for k, v in data.items()}
+        with self.lock:
+            row = self.db.execute(
+                "SELECT user_id, username, password_hash, role FROM accounts WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return dict(row) if row else None
 
     def get_account_by_username(self, username: str) -> dict | None:
-        """Lookup tài khoản qua username dùng index ngược."""
-        user_id_bytes = self.redis.get(f"account_index:{username}")
-        if not user_id_bytes:
-            return None
-        user_id = user_id_bytes.decode()
-        return self.get_account_by_userid(user_id)
+        with self.lock:
+            row = self.db.execute(
+                "SELECT user_id, username, password_hash, role FROM accounts WHERE username = ?",
+                (username,),
+            ).fetchone()
+        return dict(row) if row else None
 
     def update_password(self, user_id: str, hashed_password: str) -> bool:
-        key = f"account:{user_id}"
-        if not self.redis.exists(key):
-            return False
-        self.redis.hset(key, "password_hash", hashed_password.encode())
-        return True
+        with self.lock:
+            cur = self.db.execute(
+                "UPDATE accounts SET password_hash = ? WHERE user_id = ?",
+                (hashed_password, user_id),
+            )
+            return cur.rowcount > 0
 
     # ════════════════════════════════════════════════════════════════
-    # ENTITY 3 — FaceVector (sinh trắc học — tách biệt khỏi Employee)
+    # BẢNG 3 — faces (sinh trắc học — tách biệt khỏi employees)
     # ════════════════════════════════════════════════════════════════
 
     def save_face_vector(self, user_id: str, vector: np.ndarray) -> None:
-        """
-        Lưu face vector tại face:{user_id}.
-        Không đụng đến employee hash → không vi phạm 3NF.
-        registered_at được ghi lại để audit.
-        """
+        """Lưu face vector — không đụng đến bảng employees."""
         vector_bytes = np.array(vector, dtype=np.float32).tobytes()
-        self.redis.hset(f"face:{user_id}", mapping={
-            "user_id":          user_id.encode(),
-            "vector_embedding": vector_bytes,
-            "registered_at":    datetime.now().strftime("%Y-%m-%d %H:%M:%S").encode(),
-        })
+        registered_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self.lock:
+            self.db.execute(
+                """
+                INSERT INTO faces (user_id, vector_embedding, registered_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    vector_embedding = excluded.vector_embedding,
+                    registered_at    = excluded.registered_at
+                """,
+                (user_id, vector_bytes, registered_at),
+            )
 
     def get_face_vector(self, user_id: str) -> np.ndarray | None:
-        """Lấy face vector của user_id. Trả về None nếu chưa đăng ký."""
-        data = self.redis.hgetall(f"face:{user_id}")
-        if not data:
+        with self.lock:
+            row = self.db.execute(
+                "SELECT vector_embedding FROM faces WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        if row is None:
             return None
-        raw = data.get(b"vector_embedding")
-        if raw is None:
-            return None
-        return np.frombuffer(raw, dtype=np.float32)
+        return np.frombuffer(row["vector_embedding"], dtype=np.float32)
 
     def has_face(self, user_id: str) -> bool:
-        """Kiểm tra nhân viên đã đăng ký khuôn mặt chưa."""
-        return bool(self.redis.exists(f"face:{user_id}"))
+        with self.lock:
+            row = self.db.execute(
+                "SELECT 1 FROM faces WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row is not None
 
     # ════════════════════════════════════════════════════════════════
     # LEGACY HELPERS — giữ backward compat với service hiện tại
     # ════════════════════════════════════════════════════════════════
 
     def get_login_account(self, username: str) -> dict | None:
-        """
-        Dùng bởi AuthService.login_employee.
-        Trả về dict gồm thông tin account + user_id.
-        """
         account = self.get_account_by_username(username)
         if not account:
             return None
-        # Rename password_hash → password để tương thích với verify_password hiện tại
         account["password"] = account.pop("password_hash", "")
         return account
 

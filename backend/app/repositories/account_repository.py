@@ -1,33 +1,40 @@
 """
-backend/app/repositories/account_repository.py  (3NF Refactor)
+backend/app/repositories/account_repository.py
 
-[Entity 6] manager:{username}
-    Tài khoản manager — đơn giản, không thay đổi từ thiết kế cũ vì
-    manager không có entity Employee tương ứng.
-
-    manager:{username} → { username, password_hash, role='manager' }
+[Bảng] managers
+    Tài khoản quản lý (manager) — không có entity Employee tương ứng nên
+    vẫn là bảng độc lập, giống thiết kế Redis cũ (manager:{username}).
 """
 
-from .redis_client import get_redis
+from .db import get_db, get_lock
 
 
 class AccountRepository:
     def __init__(self):
-        self.redis = get_redis()
+        self.db = get_db()
+        self.lock = get_lock()
 
     def save_manager(self, username: str, hashed_password: str) -> None:
-        self.redis.hset(f"manager:{username}", mapping={
-            "username":      username.encode(),
-            "password_hash": hashed_password.encode(),
-            "role":          b"manager",
-        })
+        with self.lock:
+            self.db.execute(
+                """
+                INSERT INTO managers (username, password_hash, role)
+                VALUES (?, ?, 'manager')
+                ON CONFLICT(username) DO UPDATE SET
+                    password_hash = excluded.password_hash
+                """,
+                (username, hashed_password),
+            )
 
     def get_manager(self, username: str) -> dict | None:
-        key = f"manager:{username}"
-        if not self.redis.exists(key):
+        with self.lock:
+            row = self.db.execute(
+                "SELECT username, password_hash, role FROM managers WHERE username = ?",
+                (username,),
+            ).fetchone()
+        if row is None:
             return None
-        data = self.redis.hgetall(key)
-        decoded = {k.decode(): v.decode() for k, v in data.items()}
-        # Normalize: đổi password_hash → password để tương thích verify_password
-        decoded["password"] = decoded.pop("password_hash", decoded.get("password", ""))
-        return decoded
+        data = dict(row)
+        # Giữ tương thích với code cũ: đổi tên password_hash -> password
+        data["password"] = data.pop("password_hash")
+        return data

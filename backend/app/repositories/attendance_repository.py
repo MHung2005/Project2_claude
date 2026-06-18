@@ -1,34 +1,35 @@
 """
-backend/app/repositories/attendance_repository.py  (3NF Refactor)
+backend/app/repositories/attendance_repository.py
 
-[Entity 4] checkin:{date}:{user_id}
-    Chỉ lưu FK (user_id) + dữ liệu thuộc về sự kiện chấm công.
-    KHÔNG sao chép name / department / position từ Employee.
+[Bảng] checkins
+    PRIMARY KEY (date, user_id), FOREIGN KEY user_id -> employees(user_id).
+    Chỉ lưu FK (user_id) + dữ liệu của sự kiện chấm công — KHÔNG sao chép
+    name/department/position từ employees (đúng 3NF, giữ nguyên triết lý
+    thiết kế Redis cũ).
 
-    Trước (vi phạm 2NF):
-        checkin:{date}:{user_id} → { user_id, name, department, position,   ← ❌ copy từ Employee
-                                      timestamp, lat, lng, gps_ok, status,
-                                      checkout_time, ... }
-
-    Sau (đạt 3NF):
-        checkin:{date}:{user_id} → { user_id,                               ← ✅ chỉ FK
-                                      checkin_time, checkin_lat, checkin_lng,
-                                      checkin_gps_ok, checkin_status,
-                                      checkout_time, checkout_lat, checkout_lng }
-
-Khi cần hiển thị name/department/position → JOIN với employee:{user_id}.
+    Khi cần hiển thị name/department/position -> JOIN với bảng employees
+    tại thời điểm đọc (xem ManagerService._enrich_attendance_records).
 """
 
 from datetime import datetime, timedelta
 
-from .redis_client import get_redis
+from .db import get_db, get_lock
 
-CHECKIN_TTL_SECONDS = 60 * 60 * 24 * 90   # 90 ngày
+
+def _row_to_record(row) -> dict:
+    """Chuẩn hoá 1 row CSDL về dict tương thích với format API cũ (string-based)."""
+    d = dict(row)
+    d["checkin_gps_ok"] = "true" if d.get("checkin_gps_ok") else "false"
+    for k, v in list(d.items()):
+        if v is None:
+            d[k] = ""
+    return d
 
 
 class AttendanceRepository:
     def __init__(self):
-        self.redis = get_redis()
+        self.db = get_db()
+        self.lock = get_lock()
 
     # ── WRITE ────────────────────────────────────────────────────────
 
@@ -41,22 +42,24 @@ class AttendanceRepository:
         lng: float | None = None,
         gps_ok: bool = False,
     ) -> None:
-        """
-        Lưu bản ghi check-in.
-        Chỉ lưu user_id (FK) + các thuộc tính của sự kiện chấm công.
-        name/department/position KHÔNG được lưu ở đây → tránh vi phạm 2NF.
-        """
         date_str = checkin_time.split(" ")[0]
-        key = f"checkin:{date_str}:{user_id}"
-        self.redis.hset(key, mapping={
-            "user_id":         user_id.encode(),
-            "checkin_time":    checkin_time.encode(),
-            "checkin_status":  checkin_status.encode(),
-            "checkin_lat":     str(lat or "").encode(),
-            "checkin_lng":     str(lng or "").encode(),
-            "checkin_gps_ok":  (b"true" if gps_ok else b"false"),
-        })
-        self.redis.expire(key, CHECKIN_TTL_SECONDS)
+        with self.lock:
+            self.db.execute(
+                """
+                INSERT INTO checkins
+                    (date, user_id, checkin_time, checkin_status,
+                     checkin_lat, checkin_lng, checkin_gps_ok)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, user_id) DO UPDATE SET
+                    checkin_time   = excluded.checkin_time,
+                    checkin_status = excluded.checkin_status,
+                    checkin_lat    = excluded.checkin_lat,
+                    checkin_lng    = excluded.checkin_lng,
+                    checkin_gps_ok = excluded.checkin_gps_ok
+                """,
+                (date_str, user_id, checkin_time, checkin_status,
+                 lat, lng, 1 if gps_ok else 0),
+            )
 
     def save_checkout(
         self,
@@ -66,61 +69,66 @@ class AttendanceRepository:
         lat: float | None = None,
         lng: float | None = None,
     ) -> bool:
-        key = f"checkin:{date_str}:{user_id}"
-        if not self.redis.exists(key):
-            return False
-        self.redis.hset(key, mapping={
-            "checkout_time": checkout_time.encode(),
-            "checkout_lat":  str(lat or "").encode(),
-            "checkout_lng":  str(lng or "").encode(),
-        })
-        return True
+        with self.lock:
+            cur = self.db.execute(
+                """
+                UPDATE checkins
+                SET checkout_time = ?, checkout_lat = ?, checkout_lng = ?
+                WHERE date = ? AND user_id = ?
+                """,
+                (checkout_time, lat, lng, date_str, user_id),
+            )
+            return cur.rowcount > 0
 
     # ── READ — single record ─────────────────────────────────────────
 
     def exists_for_date(self, user_id: str, date_str: str) -> bool:
-        return bool(self.redis.exists(f"checkin:{date_str}:{user_id}"))
+        with self.lock:
+            row = self.db.execute(
+                "SELECT 1 FROM checkins WHERE date = ? AND user_id = ?",
+                (date_str, user_id),
+            ).fetchone()
+        return row is not None
 
     def has_checked_out(self, user_id: str, date_str: str) -> bool:
-        data = self.redis.hgetall(f"checkin:{date_str}:{user_id}")
-        return b"checkout_time" in data
+        with self.lock:
+            row = self.db.execute(
+                "SELECT checkout_time FROM checkins WHERE date = ? AND user_id = ?",
+                (date_str, user_id),
+            ).fetchone()
+        return bool(row and row["checkout_time"])
 
     def get_record(self, user_id: str, date_str: str) -> dict | None:
-        """
-        Trả về bản ghi chấm công thô (chỉ có FK + event fields).
-        Caller tự JOIN với EmployeeRepository nếu cần name/dept/position.
-        """
-        data = self.redis.hgetall(f"checkin:{date_str}:{user_id}")
-        if not data:
-            return None
-        return {k.decode(): v.decode() for k, v in data.items()}
+        with self.lock:
+            row = self.db.execute(
+                "SELECT * FROM checkins WHERE date = ? AND user_id = ?",
+                (date_str, user_id),
+            ).fetchone()
+        return _row_to_record(row) if row else None
 
     # ── READ — by date ───────────────────────────────────────────────
 
     def get_by_date(self, date_str: str) -> list[dict]:
-        """Trả về tất cả bản ghi chấm công trong ngày (chỉ có FK + event data)."""
-        records = []
-        for key in self.redis.scan_iter(f"checkin:{date_str}:*"):
-            data = self.redis.hgetall(key)
-            records.append({k.decode(): v.decode() for k, v in data.items()})
-        records.sort(key=lambda x: x.get("checkin_time", ""))
-        return records
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT * FROM checkins WHERE date = ? ORDER BY checkin_time",
+                (date_str,),
+            ).fetchall()
+        return [_row_to_record(r) for r in rows]
 
     def get_map_by_date(self, date_str: str) -> dict[str, dict]:
         """Trả về {user_id: record} cho 1 ngày."""
-        result = {}
-        for key in self.redis.scan_iter(f"checkin:{date_str}:*"):
-            data = self.redis.hgetall(key)
-            decoded = {k.decode(): v.decode() for k, v in data.items()}
-            uid = decoded.get("user_id", "")
-            if uid:
-                result[uid] = decoded
-        return result
+        return {r["user_id"]: r for r in self.get_by_date(date_str)}
 
     # ── READ — aggregates ────────────────────────────────────────────
 
     def count_by_date(self, date_str: str) -> int:
-        return sum(1 for _ in self.redis.scan_iter(f"checkin:{date_str}:*"))
+        with self.lock:
+            row = self.db.execute(
+                "SELECT COUNT(*) AS c FROM checkins WHERE date = ?",
+                (date_str,),
+            ).fetchone()
+        return row["c"] if row else 0
 
     def count_by_range(self, start_date: str, end_date: str) -> list[dict]:
         try:
@@ -130,6 +138,18 @@ class AttendanceRepository:
             return []
         if start > end:
             return []
+
+        with self.lock:
+            rows = self.db.execute(
+                """
+                SELECT date, COUNT(*) AS c FROM checkins
+                WHERE date BETWEEN ? AND ?
+                GROUP BY date
+                """,
+                (start_date, end_date),
+            ).fetchall()
+        counts = {r["date"]: r["c"] for r in rows}
+
         result = []
         day = start
         while day <= end:
@@ -137,40 +157,33 @@ class AttendanceRepository:
             result.append({
                 "date":  date_str,
                 "label": day.strftime("%a"),
-                "count": self.count_by_date(date_str),
+                "count": counts.get(date_str, 0),
             })
             day += timedelta(days=1)
         return result
 
     def get_weekly(self) -> list[dict]:
         today = datetime.now()
-        return [
-            {
-                "date":  (today - timedelta(days=i)).strftime("%Y-%m-%d"),
-                "label": (today - timedelta(days=i)).strftime("%a"),
-                "count": self.count_by_date((today - timedelta(days=i)).strftime("%Y-%m-%d")),
-            }
-            for i in range(6, -1, -1)
-        ]
+        start_date = (today - timedelta(days=6)).strftime("%Y-%m-%d")
+        end_date   = today.strftime("%Y-%m-%d")
+        return self.count_by_range(start_date, end_date)
 
     # ── READ — personal history (dùng bởi EmployeeService) ──────────
 
     def get_records_in_range(self, user_id: str, start_date: str, end_date: str) -> list[dict]:
-        """
-        Trả về các bản ghi chấm công của một nhân viên trong khoảng ngày.
-        Chỉ trả về dữ liệu thuần của sự kiện, không có employee info.
-        """
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            end   = datetime.strptime(end_date,   "%Y-%m-%d")
+            datetime.strptime(start_date, "%Y-%m-%d")
+            datetime.strptime(end_date,   "%Y-%m-%d")
         except ValueError:
             return []
-        records = []
-        day = start
-        while day <= end:
-            date_str = day.strftime("%Y-%m-%d")
-            rec = self.get_record(user_id, date_str)
-            if rec:
-                records.append(rec)
-            day += timedelta(days=1)
-        return records
+
+        with self.lock:
+            rows = self.db.execute(
+                """
+                SELECT * FROM checkins
+                WHERE user_id = ? AND date BETWEEN ? AND ?
+                ORDER BY date
+                """,
+                (user_id, start_date, end_date),
+            ).fetchall()
+        return [_row_to_record(r) for r in rows]
