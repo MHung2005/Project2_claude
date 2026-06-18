@@ -1,7 +1,10 @@
 """
-backend/app/services/auth_service.py
+backend/app/services/auth_service.py  (3NF Refactor)
 
-Business logic cho đăng nhập (Manager & Employee).
+Thay đổi:
+  - login_employee(): đọc tài khoản từ account:{user_id} qua EmployeeRepository.get_login_account()
+    thay vì đọc từ employee:{user_id} như trước.
+  - Không còn dependency vào password/username nằm trong employee hash.
 """
 
 from ..core.security import verify_password, create_token
@@ -12,10 +15,11 @@ from ..repositories.employee_repository import EmployeeRepository
 
 class AuthService:
     def __init__(self):
-        self.account_repo = AccountRepository()
+        self.account_repo  = AccountRepository()
         self.employee_repo = EmployeeRepository()
 
     # ── MANAGER ──────────────────────────────────────────────────────
+
     def login_manager(self, username: str, password: str) -> dict:
         manager = self.account_repo.get_manager(username)
         if not manager:
@@ -35,11 +39,16 @@ class AuthService:
         return {"username": payload["username"], "role": payload["role"]}
 
     # ── EMPLOYEE ─────────────────────────────────────────────────────
+
     def login_employee(self, username: str, password: str) -> dict:
+        """
+        Đọc từ account:{user_id} thông qua account_index:{username}.
+        Tài khoản xác thực đã tách biệt khỏi employee hash → đúng 3NF.
+        """
         account = self.employee_repo.get_login_account(username)
         if not account:
             raise UnauthorizedException("Tài khoản không tồn tại")
-        if not verify_password(password, account["password"]):
+        if not verify_password(password, account.get("password", "")):
             raise UnauthorizedException("Sai mật khẩu")
 
         token = create_token({

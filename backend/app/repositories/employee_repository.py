@@ -1,44 +1,55 @@
 """
-backend/app/repositories/employee_repository.py
+backend/app/repositories/employee_repository.py  (3NF Refactor)
 
-Tầng truy cập dữ liệu thuần (Redis) cho thực thể Employee + face vector.
-KHÔNG chứa business logic — chỉ đọc/ghi dữ liệu.
+Ba entity riêng biệt, mỗi entity một prefix:
+
+  [Entity 1] employee:{user_id}
+      user_id, name, department, position, email, phone
+      Chỉ chứa thông tin nhân sự thuần — KHÔNG có password/username/vector
+
+  [Entity 2] account:{user_id}
+      user_id, username, password_hash, role
+      account_index:{username} → user_id   (lookup ngược)
+      Tách biệt xác thực khỏi hồ sơ nhân sự
+
+  [Entity 3] face:{user_id}
+      user_id, vector_embedding (BINARY), registered_at
+      biometric_status được tính = "approved" nếu key tồn tại, else "none"
+      KHÔNG lưu trong employee hash → không còn transitive dependency
 """
 
+from datetime import datetime
+
 import numpy as np
-from redis.commands.search.query import Query
 
-from .redis_client import get_redis, INDEX_NAME
+from .redis_client import get_redis
 
-TEXT_FIELDS = {
-    b"user_id", b"name", b"department", b"position",
-    b"last_attendance", b"biometric_status", b"email",
-    b"phone", b"username",
-}
+# Các field được phép đọc từ employee hash
+EMPLOYEE_TEXT_FIELDS = {"user_id", "name", "department", "position", "email", "phone"}
 
 
 class EmployeeRepository:
     def __init__(self):
         self.redis = get_redis()
 
-    # ── CREATE / UPDATE ─────────────────────────────────────────────
-    def save_face(self, user_id: str, name: str, department: str, position: str, vector) -> None:
-        vector_bytes = np.array(vector, dtype=np.float32).tobytes()
-        self.redis.hset(f"employee:{user_id}", mapping={
-            "user_id":          user_id.encode(),
-            "name":             name.encode(),
-            "department":       department.encode(),
-            "position":         position.encode(),
-            "biometric_status": b"approved",   # auto-approved, no manager review
-            "vector_embedding": vector_bytes,
-        })
+    # ════════════════════════════════════════════════════════════════
+    # ENTITY 1 — Employee (hồ sơ nhân sự thuần)
+    # ════════════════════════════════════════════════════════════════
 
-    def update_face_vector(self, user_id: str, vector) -> None:
-        vector_bytes = np.array(vector, dtype=np.float32).tobytes()
-        self.redis.hset(f"employee:{user_id}", mapping={
-            "vector_embedding": vector_bytes,
-            "biometric_status": b"approved",   # auto-approved
-        })
+    def create_employee(self, user_id: str, fields: dict) -> None:
+        """
+        Tạo hồ sơ nhân sự. Chỉ lưu các trường nhân sự — không có
+        thông tin xác thực hay sinh trắc học.
+        """
+        mapping = {
+            "user_id":    user_id.encode(),
+            "name":       fields.get("name", "").encode(),
+            "department": fields.get("department", "").encode(),
+            "position":   fields.get("position", "").encode(),
+            "email":      fields.get("email", "").encode(),
+            "phone":      fields.get("phone", "").encode(),
+        }
+        self.redis.hset(f"employee:{user_id}", mapping=mapping)
 
     def update_employee(self, user_id: str, name: str, department: str, position: str) -> bool:
         key = f"employee:{user_id}"
@@ -51,63 +62,41 @@ class EmployeeRepository:
         })
         return True
 
-    def set_biometric_status(self, user_id: str, status: str) -> bool:
-        key = f"employee:{user_id}"
-        if not self.redis.exists(key):
-            return False
-        self.redis.hset(key, "biometric_status", status.encode())
-        return True
+    def delete_employee(self, user_id: str) -> bool:
+        """Xóa employee + account + face — cascade."""
+        # Lấy username để xóa index ngược
+        account = self._get_account_raw(user_id)
+        if account:
+            username = account.get(b"username", b"").decode()
+            if username:
+                self.redis.delete(f"account_index:{username}")
+        deleted = self.redis.delete(f"employee:{user_id}") > 0
+        self.redis.delete(f"account:{user_id}")
+        self.redis.delete(f"face:{user_id}")
+        return deleted
 
-    def set_last_attendance(self, user_id: str, date_str: str) -> None:
-        self.redis.hset(f"employee:{user_id}", "last_attendance", date_str.encode())
-
-    def create_from_bulk(self, user_id: str, fields: dict) -> None:
-        mapping = {
-            "user_id":          user_id.encode(),
-            "name":             fields.get("name", "").encode(),
-            "department":       fields.get("department", "").encode(),
-            "position":         fields.get("position", "").encode(),
-            "email":            fields.get("email", "").encode(),
-            "phone":            fields.get("phone", "").encode(),
-            "biometric_status": b"approved",   # auto-approved
-        }
-        self.redis.hset(f"employee:{user_id}", mapping=mapping)
-
-    def attach_login_account(self, user_id: str, username: str, hashed_password: str) -> None:
-        self.redis.hset(f"employee:{user_id}", mapping={
-            "username": username.encode(),
-            "password": hashed_password.encode(),
-            "role":     b"employee",
-        })
-        self.redis.set(f"emp_login:{username}", user_id.encode())
-
-    def update_password(self, user_id: str, hashed_password: str) -> bool:
-        key = f"employee:{user_id}"
-        if not self.redis.exists(key):
-            return False
-        self.redis.hset(key, "password", hashed_password.encode())
-        return True
-
-    # ── DELETE ───────────────────────────────────────────────────────
-    def delete(self, user_id: str) -> bool:
-        return self.redis.delete(f"employee:{user_id}") > 0
-
-    # ── READ ─────────────────────────────────────────────────────────
     def exists(self, user_id: str) -> bool:
         return bool(self.redis.exists(f"employee:{user_id}"))
 
     def get_raw(self, user_id: str) -> dict:
+        """Trả về raw bytes dict của employee hash."""
         return self.redis.hgetall(f"employee:{user_id}")
 
-    def get_face_vector(self, user_id: str):
-        """Lấy vector embedding của đúng user_id, trả về numpy array hoặc None."""
+    def get_employee(self, user_id: str) -> dict | None:
+        """Trả về thông tin nhân sự đã decode, kèm biometric_status tính toán."""
         data = self.redis.hgetall(f"employee:{user_id}")
         if not data:
             return None
-        raw = data.get(b"vector_embedding")
-        if raw is None:
-            return None
-        return np.frombuffer(raw, dtype=np.float32)
+        decoded = {
+            k.decode(): v.decode()
+            for k, v in data.items()
+            if k.decode() in EMPLOYEE_TEXT_FIELDS
+        }
+        # biometric_status là derived attribute — tính từ sự tồn tại của face key
+        decoded["biometric_status"] = (
+            "approved" if self.redis.exists(f"face:{user_id}") else "none"
+        )
+        return decoded
 
     def get_all(self) -> list[dict]:
         employees = []
@@ -118,63 +107,113 @@ class EmployeeRepository:
                     continue
                 decoded = {}
                 for k, v in data.items():
-                    field_name = k if isinstance(k, bytes) else k.encode()
-                    if field_name in TEXT_FIELDS:
-                        decoded[k.decode() if isinstance(k, bytes) else k] = (
-                            v.decode() if isinstance(v, bytes) else v
-                        )
+                    field = k.decode() if isinstance(k, bytes) else k
+                    if field in EMPLOYEE_TEXT_FIELDS:
+                        decoded[field] = v.decode() if isinstance(v, bytes) else v
                 if "user_id" not in decoded:
                     continue
-                employees.append({
-                    "user_id":          decoded.get("user_id", ""),
-                    "name":             decoded.get("name", ""),
-                    "department":       decoded.get("department", ""),
-                    "position":         decoded.get("position", ""),
-                    "email":            decoded.get("email", ""),
-                    "phone":            decoded.get("phone", ""),
-                    "biometric_status": decoded.get("biometric_status", "approved"),
-                    "last_attendance":  decoded.get("last_attendance", ""),
-                })
+                uid = decoded["user_id"]
+                decoded["biometric_status"] = (
+                    "approved" if self.redis.exists(f"face:{uid}") else "none"
+                )
+                employees.append(decoded)
             except Exception as e:
                 print(f"[EmployeeRepository.get_all] Lỗi key '{key}': {e}")
         return employees
 
+    # ════════════════════════════════════════════════════════════════
+    # ENTITY 2 — Account (xác thực — tách biệt khỏi Employee)
+    # ════════════════════════════════════════════════════════════════
+
+    def attach_account(self, user_id: str, username: str, hashed_password: str,
+                        role: str = "employee") -> None:
+        """
+        Tạo/cập nhật tài khoản xác thực cho employee.
+        Lưu tại account:{user_id} — KHÔNG lưu trong employee hash.
+        Tạo thêm index ngược account_index:{username} → user_id.
+        """
+        self.redis.hset(f"account:{user_id}", mapping={
+            "user_id":       user_id.encode(),
+            "username":      username.encode(),
+            "password_hash": hashed_password.encode(),
+            "role":          role.encode(),
+        })
+        # Index ngược để login bằng username
+        self.redis.set(f"account_index:{username}", user_id.encode())
+
+    def _get_account_raw(self, user_id: str) -> dict:
+        return self.redis.hgetall(f"account:{user_id}")
+
+    def get_account_by_userid(self, user_id: str) -> dict | None:
+        data = self.redis.hgetall(f"account:{user_id}")
+        if not data:
+            return None
+        return {k.decode(): v.decode() for k, v in data.items()}
+
+    def get_account_by_username(self, username: str) -> dict | None:
+        """Lookup tài khoản qua username dùng index ngược."""
+        user_id_bytes = self.redis.get(f"account_index:{username}")
+        if not user_id_bytes:
+            return None
+        user_id = user_id_bytes.decode()
+        return self.get_account_by_userid(user_id)
+
+    def update_password(self, user_id: str, hashed_password: str) -> bool:
+        key = f"account:{user_id}"
+        if not self.redis.exists(key):
+            return False
+        self.redis.hset(key, "password_hash", hashed_password.encode())
+        return True
+
+    # ════════════════════════════════════════════════════════════════
+    # ENTITY 3 — FaceVector (sinh trắc học — tách biệt khỏi Employee)
+    # ════════════════════════════════════════════════════════════════
+
+    def save_face_vector(self, user_id: str, vector: np.ndarray) -> None:
+        """
+        Lưu face vector tại face:{user_id}.
+        Không đụng đến employee hash → không vi phạm 3NF.
+        registered_at được ghi lại để audit.
+        """
+        vector_bytes = np.array(vector, dtype=np.float32).tobytes()
+        self.redis.hset(f"face:{user_id}", mapping={
+            "user_id":          user_id.encode(),
+            "vector_embedding": vector_bytes,
+            "registered_at":    datetime.now().strftime("%Y-%m-%d %H:%M:%S").encode(),
+        })
+
+    def get_face_vector(self, user_id: str) -> np.ndarray | None:
+        """Lấy face vector của user_id. Trả về None nếu chưa đăng ký."""
+        data = self.redis.hgetall(f"face:{user_id}")
+        if not data:
+            return None
+        raw = data.get(b"vector_embedding")
+        if raw is None:
+            return None
+        return np.frombuffer(raw, dtype=np.float32)
+
+    def has_face(self, user_id: str) -> bool:
+        """Kiểm tra nhân viên đã đăng ký khuôn mặt chưa."""
+        return bool(self.redis.exists(f"face:{user_id}"))
+
+    # ════════════════════════════════════════════════════════════════
+    # LEGACY HELPERS — giữ backward compat với service hiện tại
+    # ════════════════════════════════════════════════════════════════
+
     def get_login_account(self, username: str) -> dict | None:
-        user_id = self.redis.get(f"emp_login:{username}")
-        if not user_id:
+        """
+        Dùng bởi AuthService.login_employee.
+        Trả về dict gồm thông tin account + user_id.
+        """
+        account = self.get_account_by_username(username)
+        if not account:
             return None
-        data = self.redis.hgetall(f"employee:{user_id.decode()}")
-        result = {}
-        for k, v in data.items():
-            key = k.decode()
-            if key == "vector_embedding":
-                continue  # skip binary field
-            result[key] = v.decode()
-        return result
+        # Rename password_hash → password để tương thích với verify_password hiện tại
+        account["password"] = account.pop("password_hash", "")
+        return account
 
-    # ── VECTOR SEARCH (kept for manager use, not for checkin) ────────
-    def search_by_vector(self, query_vector, top_k: int = 1) -> dict | None:
-        vector_bytes = np.array(query_vector, dtype=np.float32).tobytes()
-        q = (
-            Query(f"*=>[KNN {top_k} @vector_embedding $vector_param AS score]")
-            .sort_by("score")
-            .return_fields("user_id", "name", "department", "position", "score")
-            .dialect(2)
-        )
-        results = self.redis.ft(INDEX_NAME).search(q, {"vector_param": vector_bytes})
-        if not results.docs:
-            return None
-        doc = results.docs[0]
-        return {
-            "user_id":    doc.user_id.decode() if isinstance(doc.user_id, bytes) else doc.user_id,
-            "name":       doc.name.decode() if isinstance(doc.name, bytes) else doc.name,
-            "department": doc.department.decode() if isinstance(doc.department, bytes) else doc.department,
-            "position":   doc.position.decode() if isinstance(doc.position, bytes) else doc.position,
-            "score":      1 - float(doc.score),
-        }
-
-    def cosine_similarity(self, vec_a: np.ndarray, vec_b: np.ndarray) -> float:
-        """Tính cosine similarity giữa 2 vector."""
+    @staticmethod
+    def cosine_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
         norm_a = np.linalg.norm(vec_a)
         norm_b = np.linalg.norm(vec_b)
         if norm_a == 0 or norm_b == 0:
