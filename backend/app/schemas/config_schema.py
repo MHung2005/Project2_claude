@@ -12,6 +12,5 @@ class LocationConfigRequest(BaseModel):
 
 
 class ScheduleConfigRequest(BaseModel):
-    start_time:    str  # "HH:MM"
-    end_time:      str  # "HH:MM"
-    grace_minutes: int = 0
+    start_time: str  # "HH:MM"
+    end_time:   str  # "HH:MM"

@@ -1,15 +1,5 @@
 """
 backend/app/api/manager.py
-
-Controller — chức năng của Quản lý (Manager):
-  - Employee CRUD            : /manager/employees
-  - Bulk import              : /manager/employees/bulk-import
-  - Attendance records       : /manager/attendance
-  - Analytics                : /manager/analytics/daily, /stats, /stats/weekly, /stats/range
-  - Location config          : /manager/location
-  - Schedule config          : /manager/schedule
-
-NOTE: Biometric approval đã bị bỏ — khuôn mặt tự động approved khi nhân viên đăng ký.
 """
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, Query
@@ -166,5 +156,5 @@ def set_schedule(
     body: ScheduleConfigRequest,
     current_manager: dict = Depends(get_current_manager),
 ):
-    config_service.set_schedule(body.start_time, body.end_time, body.grace_minutes)
+    config_service.set_schedule(body.start_time, body.end_time)
     return success_response("Đã cập nhật lịch làm việc")

@@ -50,5 +50,5 @@ export const setLocationConfig = (lat, lng, radius) =>
 
 export const getSchedule = () => api.get('/manager/schedule');
 
-export const setSchedule = (start_time, end_time, grace_minutes) =>
-  api.put('/manager/schedule', { start_time, end_time, grace_minutes });
+export const setSchedule = (start_time, end_time) =>
+  api.put('/manager/schedule', { start_time, end_time });

@@ -12,6 +12,7 @@ import ManagerDashboard from './pages/ManagerDashboard';
 import BulkImport from './pages/BulkImport';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import LocationConfig from './pages/LocationConfig';
+import ScheduleConfig from './pages/ScheduleConfig';
 import EmployeeManager from './pages/EmployeeManager';
 import './styles/global.css';
 
@@ -110,6 +111,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="manager">
                   <LocationConfig />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lich-lam-viec"
+              element={
+                <ProtectedRoute role="manager">
+                  <ScheduleConfig />
                 </ProtectedRoute>
               }
             />
