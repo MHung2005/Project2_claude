@@ -22,6 +22,12 @@ Thay đổi quan trọng so với phiên bản cũ:
 
 5. change_password():
    - Đọc/ghi từ account:{user_id} thay vì employee:{user_id}
+
+[BUG FIX] _verify_face_against_user():
+   - TRƯỚC: raise UnauthorizedException → HTTP 401 → frontend auto-logout nhân viên
+   - SAU:   raise ValidationException   → HTTP 422 → frontend hiển thị thông báo lỗi
+   HTTP 401 chỉ dành cho "token không hợp lệ / hết hạn", KHÔNG dùng cho lỗi nghiệp vụ
+   như khuôn mặt không khớp — tránh side-effect auto-logout không mong muốn.
 """
 
 from datetime import datetime
@@ -45,7 +51,7 @@ from .config_service import ConfigService
 
 class EmployeeService:
     def __init__(self):
-        self.employee_repo  = EmployeeRepository()
+        self.employee_repo   = EmployeeRepository()
         self.attendance_repo = AttendanceRepository()
         self.config_service  = ConfigService()
         self.face_embed      = FaceEmbeddingService()
@@ -81,6 +87,12 @@ class EmployeeService:
         """
         So khớp vector với face:{user_id}.
         FaceVector đã tách thành entity riêng → đọc từ employee_repo.get_face_vector().
+
+        [BUG FIX] Dùng ValidationException (HTTP 422) thay vì UnauthorizedException (HTTP 401)
+        khi khuôn mặt không khớp:
+          - HTTP 401 = "token không hợp lệ" → hầu hết frontend/mobile sẽ auto-logout
+          - HTTP 422 = "lỗi nghiệp vụ"      → frontend hiển thị thông báo, giữ session
+        Nhân viên chấm công sai mặt KHÔNG nên bị đăng xuất khỏi hệ thống.
         """
         stored_vector = self.employee_repo.get_face_vector(user_id)
         if stored_vector is None:
@@ -89,7 +101,8 @@ class EmployeeService:
             )
         similarity = self.employee_repo.cosine_similarity(query_vector, stored_vector)
         if similarity < settings.FACE_MATCH_THRESHOLD:
-            raise UnauthorizedException(
+            # ✅ ValidationException (422) — KHÔNG phải UnauthorizedException (401)
+            raise ValidationException(
                 f"Khuôn mặt không khớp (độ tương đồng: {similarity:.2f}). "
                 "Vui lòng thử lại với điều kiện ánh sáng tốt hơn."
             )
